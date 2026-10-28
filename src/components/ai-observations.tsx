@@ -34,7 +34,7 @@ export function AIObservations({
         <Sparkles className="size-4 text-primary" />
         Yapay zekâ gözlemleri
       </h3>
-      <div role="status" className="text-xs leading-6 text-muted-foreground">
+      <div role="status" className="text-sm leading-6 text-muted-foreground">
         {state.status === "local" &&
           "AI kullanılmadı. Yalnızca yerel kontroller çalıştırıldı."}
         {state.status === "loading" && (
@@ -50,7 +50,7 @@ export function AIObservations({
       {state.status === "success" && (
         <div className="mt-4 space-y-3">
           {!state.result.observations.length && (
-            <p className="rounded-lg border p-4 text-xs leading-6">
+            <p className="rounded-lg border p-4 text-sm leading-6">
               Sağlayıcı ek gözlem bildirmedi. Bu, bilgilerin doğrulandığı veya
               eksiksiz olduğu anlamına gelmez.
             </p>
@@ -64,30 +64,30 @@ export function AIObservations({
                 <Badge className="border-amber-200 bg-amber-50 text-amber-900">
                   {observation.category}
                 </Badge>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   AI-{index + 1} · OpenAI
                 </span>
               </div>
               <h4 className="text-sm font-semibold">{observation.title}</h4>
-              <p className="mt-2 text-xs leading-6">
+              <p className="mt-2 text-sm leading-6">
                 {observation.explanation}
               </p>
               <div className="my-3 space-y-2 border-l-2 border-border pl-3">
                 {observation.evidence.map((evidence, i) => (
                   <div key={i}>
-                    <p className="text-[11px] font-medium">
+                    <p className="text-sm font-medium">
                       {sources.get(evidence.fieldId)?.label}
                     </p>
-                    <code className="break-all text-[10px] text-muted-foreground">
+                    <code className="break-all text-sm text-muted-foreground">
                       {evidence.fieldId}
                     </code>
-                    <blockquote className="mt-1 whitespace-pre-wrap text-xs leading-5">
+                    <blockquote className="mt-1 whitespace-pre-wrap text-sm leading-5">
                       {evidence.quote || "Alan boş bırakıldı."}
                     </blockquote>
                   </div>
                 ))}
               </div>
-              <p className="flex gap-2 rounded-md bg-muted p-3 text-xs leading-5">
+              <p className="flex gap-2 rounded-md bg-muted p-3 text-sm leading-5">
                 <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-primary" />
                 {observation.question}
               </p>

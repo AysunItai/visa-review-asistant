@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dayNumber } from "./dates.ts";
 import { narrativeSchema, emptyNarratives } from "./narratives.ts";
+import { profileSchema, emptyProfile } from "./applicant-profile.ts";
 
 export const destinations = ["ABD", "Kanada", "Türkiye", "Almanya"] as const;
 export const purposes = [
@@ -65,6 +66,7 @@ export const applicationSchema = z
     }),
     notes: z.string().max(2000, "Açıklama en fazla 2.000 karakter olabilir."),
     narratives: narrativeSchema,
+    profile: profileSchema,
   })
   .superRefine((data, ctx) => {
     if (dayNumber(data.returnDate) < dayNumber(data.departure))
@@ -95,5 +97,6 @@ export function emptyApplication(): Application {
     },
     notes: "",
     narratives: emptyNarratives(),
+    profile: emptyProfile(),
   };
 }

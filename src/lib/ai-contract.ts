@@ -7,7 +7,7 @@ import {
 import { narrativeSchema, narrativeFields } from "./narratives.ts";
 import { dayNumber } from "./dates.ts";
 
-// Explicit allowlist: reference and private reviewer notes cannot enter this contract.
+// Explicit allowlist: reference, reviewer notes, and applicant profile stay local.
 const shape = applicationSchema.shape;
 export const contextSchema = z
   .strictObject({
@@ -50,9 +50,19 @@ export function toAIRequest(application: Application): AIRequest {
         checkIn,
         checkOut,
       })),
-      declarations: { ...application.declarations },
+      declarations: {
+        identity: application.declarations.identity,
+        itinerary: application.declarations.itinerary,
+        budget: application.declarations.budget,
+        accommodation: application.declarations.accommodation,
+      },
     },
-    narratives: { ...application.narratives },
+    narratives: {
+      travelPurpose: application.narratives.travelPurpose,
+      funding: application.narratives.funding,
+      accommodation: application.narratives.accommodation,
+      fictionalExcerpts: application.narratives.fictionalExcerpts,
+    },
     anonymized: true,
   };
 }

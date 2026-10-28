@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import {
   useFieldArray,
   useForm,
@@ -20,12 +20,14 @@ import {
   RotateCcw,
   Sparkles,
   Trash2,
+  UserRound,
   Wallet,
   Waypoints,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/form-field";
+import { ApplicantProfileFields } from "@/components/applicant-profile-fields";
 import {
   applicationSchema,
   currencies,
@@ -36,7 +38,10 @@ import {
   stayTypes,
   type Application,
 } from "@/lib/validation";
-import { getSample, sampleLabels, type SampleKey } from "@/lib/samples";
+import { getSample, sampleLabels, sampleDescriptions, type SampleKey } from "@/lib/samples";
+import { applicationSteps, stepForField, validateStep } from "@/lib/application-steps";
+import { dayNumber } from "@/lib/dates";
+import { ApplicationSummary } from "@/components/application-summary";
 import { narrativeFields, type AnalysisOptions } from "@/lib/narratives";
 
 export function ApplicationForm({
@@ -44,11 +49,13 @@ export function ApplicationForm({
   onEdited,
   onClear,
   analyzing,
+  active,
 }: {
   onReview: (application: Application, options: AnalysisOptions) => void;
   onEdited: () => void;
   onClear: () => void;
   analyzing: boolean;
+  active: boolean;
 }) {
   const form = useForm<Application>({ defaultValues: emptyApplication() });
   const { register, control, formState, getFieldState } = form;
@@ -57,6 +64,21 @@ export function ApplicationForm({
   const [feedback, setFeedback] = useState("");
   const [useAI, setUseAI] = useState(false);
   const [anonymized, setAnonymized] = useState(false);
+  const [step, setStep] = useState(0);
+  const [reached, setReached] = useState(0);
+  const [summary, setSummary] = useState<Application | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const departure = useWatch({ control, name: "departure" });
+  const returnDate = useWatch({ control, name: "returnDate" });
+  const nights = dayNumber(returnDate) - dayNumber(departure);
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (active && !wasActive.current) {
+      headingRef.current?.focus({ preventScroll: true });
+      headingRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+    wasActive.current = active;
+  }, [active]);
   const currency = useWatch({ control, name: "currency" });
   const notes = useWatch({ control, name: "notes" });
   const error = (path: FieldPath<Application>) =>
@@ -69,46 +91,76 @@ export function ApplicationForm({
         .filter(Boolean)
         .join(" ") || undefined,
   });
+  function focusStep(next: number, invalid = false) {
+    setStep(next);
+    requestAnimationFrame(() => {
+      const container = document.getElementById(`application-step-${next}`);
+      const field = invalid ? container?.querySelector<HTMLElement>('[aria-invalid="true"]') : null;
+      const target = field ?? headingRef.current;
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "start", behavior: "auto" });
+    });
+  }
+  function showErrors(issues: { path: PropertyKey[]; message: string }[], final: boolean) {
+    const firstStep = final ? Math.min(...issues.map((issue) => stepForField(issue.path.join(".")))) : step;
+    const paths = new Set<string>();
+    for (const issue of issues) {
+      const path = issue.path.join(".");
+      if (!paths.has(path)) {
+        form.setError(path as FieldPath<Application>, { type: "validate", message: issue.message });
+        paths.add(path);
+      }
+    }
+    focusStep(firstStep, true);
+    setFeedback("Lütfen işaretlenen alanları düzeltin.");
+  }
+  function navigate(next: number, data: Application) {
+    if (analyzing) return;
+    form.clearErrors();
+    if (next > step) {
+      const result = validateStep(data, step);
+      if (!result.success) { showErrors(result.error.issues, false); return; }
+    }
+    setSummary(data);
+    setReached((previous) => Math.max(previous, next));
+    setFeedback("");
+    focusStep(next);
+  }
   function submit(data: Application) {
+    if (analyzing) return;
+    if (step < 3) { navigate(step + 1, data); return; }
     form.clearErrors();
     const result = applicationSchema.safeParse(data);
-    if (!result.success) {
-      const paths = new Set<string>();
-      for (const issue of result.error.issues) {
-        const path = issue.path.join(".");
-        if (!paths.has(path)) {
-          form.setError(
-            path as FieldPath<Application>,
-            { type: "validate", message: issue.message },
-            { shouldFocus: paths.size === 0 }
-          );
-          paths.add(path);
-        }
-      }
-      setFeedback(
-        "Lütfen işaretlenen alanları kontrol edin. Rapor oluşturulmadı."
-      );
-      return;
-    }
+    if (!result.success) { showErrors(result.error.issues, true); return; }
     onReview(result.data, { useAI, anonymized });
-    setFeedback(
-      useAI
-        ? "Yerel rapor oluşturuldu. AI isteğinin durumu raporda gösterilir."
-        : "İnceleme raporu oluşturuldu."
-    );
   }
   function loadSample() {
     form.reset(getSample(sample));
     setAnonymized(false);
-    onEdited();
-    setFeedback(
-      "Örnek bilgiler yüklendi. Rapor oluşturmak için inceleme düğmesine basın."
+    setUseAI(false);
+    setReached(0);
+    setSummary(null);
+    onClear();
+    focusStep(0);
+    setFeedback("Kurgusal örnek yüklendi. Bilgileri adım adım kontrol edin.");
+  }
+  function narrative(key: keyof typeof narrativeFields) {
+    const path = `narratives.${key}` as const;
+    const field = narrativeFields[key];
+    return (
+      <FormField id={path} label={field.label} optional error={error(path)}
+        hint={key === "fictionalExcerpts"
+          ? "Yalnızca kurgusal belge metni girin. Yapay zekâ incelemesini seçip onay verirseniz OpenAI’a gönderilir."
+          : "Yapay zekâ incelemesini seçip onay verirseniz bu açıklama OpenAI’a gönderilir. Kişi adı, kimlik veya iletişim bilgisi eklemeyin."}>
+        <textarea {...register(path)} {...accessible(path, true)} rows={3} maxLength={field.limit}
+          className="field-control min-h-24 resize-y py-3" />
+      </FormField>
     );
   }
   return (
     <div className="form-column">
       <div className="sample-bar">
-        <div className="flex items-center gap-2 text-xs font-medium text-primary">
+        <div className="flex items-center gap-2 text-sm font-medium text-primary">
           <Sparkles className="size-4" />
           Bir örnekle başlayın
         </div>
@@ -129,14 +181,15 @@ export function ApplicationForm({
             </select>
             <ChevronDown />
           </div>
-          <Button variant="outline" onClick={loadSample} className="text-xs">
+          <Button variant="outline" onClick={loadSample} disabled={analyzing} className="text-sm">
             Örnek Başvuru Yükle <ArrowRight className="size-3.5" />
           </Button>
         </div>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{sampleDescriptions[sample]}</p>
       </div>
       <form
         noValidate
-        onSubmit={form.handleSubmit(submit)}
+        onSubmit={(event) => void form.handleSubmit(submit)(event)}
         onChange={(event) => {
           if (
             !(
@@ -151,12 +204,26 @@ export function ApplicationForm({
         className="form-panel"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-6 py-5">
-          <h2 className="text-sm font-semibold">Başvuru formu</h2>
-          <span className="text-[11px] text-muted-foreground">
-            6 kısa bölüm
-          </span>
+          <div>
+            <p aria-live="polite" aria-atomic="true" className="mb-2 text-sm text-muted-foreground">Adım {step + 1} / 4</p>
+            <h2 ref={headingRef} tabIndex={-1} id="form-step-title" className="text-lg font-semibold">{applicationSteps[step]}</h2>
+          </div>
         </div>
-        <Section number="01" title="Başvuru bilgileri" icon={<Waypoints />}>
+        <nav aria-label="Başvuru adımları" className="step-navigation">
+          <ol>
+            {applicationSteps.map((label, index) => (
+              <li key={label}>
+                <button type="button" aria-current={step === index ? "step" : undefined}
+                  aria-label={`${index + 1}. adım: ${label}`} disabled={index > reached || analyzing}
+                  onClick={() => void form.handleSubmit((data) => navigate(index, data))()}>
+                  <span className="step-number">{index + 1}</span><span className="step-name">{label}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
+        <div id="application-step-0" hidden={step !== 0}>
+        <Section title="Başvuru bilgileri" icon={<Waypoints />}>
           <FormField
             id="reference"
             label="Başvuru referansı"
@@ -179,7 +246,7 @@ export function ApplicationForm({
               error={error("destination")}
             >
               <div className="select-wrap">
-                <select
+                <select required
                   {...register("destination")}
                   {...accessible("destination")}
                   className="field-control"
@@ -197,7 +264,7 @@ export function ApplicationForm({
               error={error("purpose")}
             >
               <div className="select-wrap">
-                <select
+                <select required
                   {...register("purpose")}
                   {...accessible("purpose")}
                   className="field-control"
@@ -236,16 +303,31 @@ export function ApplicationForm({
               />
             </FormField>
           </div>
-          <p className="flex items-start gap-2 text-[11px] leading-5 text-muted-foreground">
+          <p className="text-sm leading-6 text-muted-foreground">
+            {Number.isFinite(nights) && nights >= 0 ? `Seyahat süresi: ${nights} gece / ${nights + 1} takvim günü. ` : ""}
+            Gece sayısı dönüş ile gidiş arasındaki farktır. Aynı gün dönüş 0 gece, 1 takvim günüdür.
+          </p>
+          {narrative("travelPurpose")}
+          <p className="flex items-start gap-2 text-sm leading-5 text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" />
             Ülke seçimi yalnızca bağlam sağlar. Bu sürüm ülkeye özgü vize
             kurallarını kontrol etmez.
           </p>
         </Section>
-        <Section number="02" title="Seyahat bütçesi" icon={<Wallet />}>
+        </div>
+        <div id="application-step-1" hidden={step !== 1}>
+        <Section title="Kişisel bilgiler ve çalışma durumu" icon={<UserRound />}>
+          <ApplicantProfileFields form={form} group="personal" />
+        </Section>
+        <Section title="Seyahat geçmişi ve yurt dışı bağlantıları" icon={<Waypoints />}>
+          <ApplicantProfileFields form={form} group="travel" />
+        </Section>
+        </div>
+        <div id="application-step-2" hidden={step !== 2}>
+        <Section title="Seyahat bütçesi ve varlıklar" icon={<Wallet />}>
           <FormField id="currency" label="Para birimi">
             <div className="select-wrap max-w-40">
-              <select
+              <select required
                 {...register("currency")}
                 {...accessible("currency")}
                 className="field-control"
@@ -293,20 +375,22 @@ export function ApplicationForm({
               </div>
             </FormField>
           </div>
-          <p className="text-[11px] leading-5 text-muted-foreground">
+          <p className="text-sm leading-5 text-muted-foreground">
             Maliyet sizin tahmininizdir; resmî bir finansal gereklilik değildir.
             İki tutar aynı para birimindedir, kur dönüşümü yapılmaz. Ondalık
             ayırıcı olarak virgül veya nokta kullanın.
           </p>
+          <ApplicantProfileFields form={form} group="financial" />
+          {narrative("funding")}
         </Section>
-        <Section number="03" title="Konaklama" icon={<Building2 />}>
+        <Section title="Konaklama" icon={<Building2 />}>
           {!fields.length && (
             <div className="rounded-lg border border-dashed bg-muted px-4 py-5 text-center">
               <Building2 className="mx-auto mb-2 size-5 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Konaklama bilgisi henüz girilmedi
               </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Bilgi olmadan da incelemeye devam edebilirsiniz.
               </p>
             </div>
@@ -317,7 +401,7 @@ export function ApplicationForm({
               className="space-y-3 rounded-lg border bg-white p-3.5"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">
+                <span className="text-sm font-medium text-muted-foreground">
                   Konaklama {index + 1}
                 </span>
                 <Button
@@ -326,6 +410,7 @@ export function ApplicationForm({
                   aria-label={`${index + 1}. konaklamayı kaldır`}
                   onClick={() => {
                     remove(index);
+                    setAnonymized(false);
                     onEdited();
                   }}
                 >
@@ -334,7 +419,7 @@ export function ApplicationForm({
               </div>
               <FormField id={`stays.${index}.type`} label="Konaklama türü">
                 <div className="select-wrap">
-                  <select
+                  <select required
                     className="field-control"
                     {...register(`stays.${index}.type`)}
                     {...accessible(`stays.${index}.type`)}
@@ -379,20 +464,22 @@ export function ApplicationForm({
             size="sm"
             onClick={() => {
               append({ type: "Otel", checkIn: "", checkOut: "" });
+              setAnonymized(false);
               onEdited();
             }}
           >
             <Plus />
             Konaklama ekle
           </Button>
-          <p className="text-[11px] leading-5 text-muted-foreground">
+          <p className="text-sm leading-5 text-muted-foreground">
             Çıkış günü gece sayısına dahil edilmez. Aynı gün dönülen
             seyahatlerde konaklama gecesi yoktur.
           </p>
         </Section>
-        <Section number="04" title="Belge durumu" icon={<FileCheck2 />}>
-          <p className="text-xs leading-5 text-muted-foreground">
-            Yalnızca başvuru sahibinin bilgi beyanını işaretleyin.
+        <div className="px-4 pb-6 sm:px-6">{narrative("accommodation")}</div>
+        <Section title="Belge durumu" icon={<FileCheck2 />}>
+          <p className="text-sm leading-5 text-muted-foreground">
+            Yalnızca başvuru sahibinin bilgi beyanını işaretleyin. İşaretleme isteğe bağlıdır; eksik beyanlar raporda netleştirme sorusu olarak gösterilir.
           </p>
           <div className="space-y-1">
             {(
@@ -400,7 +487,7 @@ export function ApplicationForm({
             ).map((key) => (
               <label
                 key={key}
-                className="choice-label flex cursor-pointer items-center gap-3 rounded-md py-2 text-xs leading-5"
+                className="choice-label flex cursor-pointer items-center gap-3 rounded-md py-2 text-sm leading-5"
               >
                 <span className="relative flex size-4 shrink-0 items-center justify-center">
                   <input
@@ -414,18 +501,21 @@ export function ApplicationForm({
               </label>
             ))}
           </div>
-          <p className="text-[11px] leading-5 text-muted-foreground">
+          <p className="text-sm leading-5 text-muted-foreground">
             İşaretler belge yüklendiği, incelendiği veya doğrulandığı anlamına
             gelmez; yasal belge zorunluluğu belirtmez.
           </p>
         </Section>
-        <Section number="05" title="Açıklama" icon={<MessageSquareText />}>
+        </div>
+        <div id="application-step-3" hidden={step !== 3}>
+        {summary && <ApplicationSummary application={summary} onEdit={(next) => focusStep(next)} />}
+        <Section title="Açıklama" icon={<MessageSquareText />}>
           <FormField
             id="notes"
             label="İnceleme notu"
             optional
             error={error("notes")}
-            hint="Pasaport numarası veya hassas kişisel bilgi girmeyin. Bu alan otomatik kurallarda değerlendirilmez."
+            hint="Yalnızca bu çalışma alanında kalır; OpenAI’a ve kopyalanan rapora eklenmez. Pasaport numarası veya hassas kişisel bilgi girmeyin."
           >
             <textarea
               {...register("notes")}
@@ -435,53 +525,18 @@ export function ApplicationForm({
               placeholder="Netleştirmek istediğiniz bir ayrıntı varsa buraya yazın…"
               className="field-control min-h-24 resize-y py-3"
             />
-            <p className="text-right text-[10px] text-muted-foreground">
+            <p className="text-right text-sm text-muted-foreground">
               {new Intl.NumberFormat("tr-TR").format(notes.length)} / 2.000
             </p>
           </FormField>
         </Section>
-        <Section number="06" title="AI için açıklamalar" icon={<Sparkles />}>
-          <p className="text-xs leading-6 text-muted-foreground">
-            Bu alanlar yalnızca AI seçeneğiyle değerlendirilir. Sadece
-            anonimleştirilmiş veya kurgusal seyahat bilgisi girin. Ad,
-            pasaport/kimlik numarası, iletişim bilgisi ve ilgisiz kişisel bilgi
-            eklemeyin. Gerçek belge yüklemeyin veya kopyalamayın.
-          </p>
-          {(
-            Object.keys(narrativeFields) as (keyof typeof narrativeFields)[]
-          ).map((key) => {
-            const path = `narratives.${key}` as const;
-            const field = narrativeFields[key];
-            return (
-              <FormField
-                key={key}
-                id={path}
-                label={field.label}
-                optional
-                error={error(path)}
-                hint={`En fazla ${new Intl.NumberFormat("tr-TR").format(
-                  field.limit
-                )} karakter. ${
-                  key === "fictionalExcerpts"
-                    ? "Yalnızca kişisel bilgi içermeyen, kurgusal belge metni kullanın."
-                    : "Kişi ve kurum adları yerine genel ifadeler kullanın."
-                }`}
-              >
-                <textarea
-                  {...register(path)}
-                  {...accessible(path, true)}
-                  rows={3}
-                  maxLength={field.limit}
-                  className="field-control min-h-24 resize-y py-3"
-                />
-              </FormField>
-            );
-          })}
+        <Section title="İnceleme yöntemi ve ek açıklama" icon={<Sparkles />}>
+          {narrative("fictionalExcerpts")}
           <fieldset className="min-w-0 space-y-3 rounded-lg border bg-muted p-4">
-            <legend className="px-1 text-xs font-semibold">
+            <legend className="px-1 text-sm font-semibold">
               İnceleme yöntemi
             </legend>
-            <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-xs leading-5">
+            <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-sm leading-5">
               <input
                 type="radio"
                 name="analysis-mode"
@@ -494,7 +549,7 @@ export function ApplicationForm({
               />
               Yalnızca yerel kontroller — dışarıya bilgi gönderilmez
             </label>
-            <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-xs leading-5">
+            <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-sm leading-5">
               <input
                 type="radio"
                 name="analysis-mode"
@@ -504,15 +559,17 @@ export function ApplicationForm({
               />
               Yerel kontroller + OpenAI gözlemleri
             </label>
-            <p className="text-[11px] leading-6 text-muted-foreground">
+            <p className="text-sm leading-6 text-muted-foreground">
               AI seçildiğinde ülke, seyahat amacı, tarihler, bütçe, konaklama
-              kayıtları, beyan işaretleri ve bu dört açıklama alanı harici
+              kayıtları, beyan işaretleri; seyahat amacı, finansman, konaklama
+              açıklamaları ve kurgusal belge alıntıları harici
               sağlayıcı OpenAI’a gönderilir. Başvuru referansı ve özel inceleme
-              notu gönderilmez. Sağlayıcının veri işleme koşulları geçerlidir.
+              notu; kişisel/çalışma bilgileri, seyahat geçmişi, yurt dışı bağlantıları,
+              varlıklar ve ödeme yöntemleri gönderilmez. Sağlayıcının veri işleme koşulları geçerlidir.
               İstek API kullanım ücreti doğurabilir.
             </p>
             {useAI && (
-              <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-xs leading-5">
+              <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-sm leading-5">
                 <input
                   type="checkbox"
                   name="ai-consent"
@@ -527,9 +584,18 @@ export function ApplicationForm({
             )}
           </fieldset>
         </Section>
-        <div className="border-t bg-muted p-5 sm:px-6">
+        </div>
+        <div className="wizard-actions border-t bg-muted p-5 sm:px-6">
           <div className="form-actions">
-            <Button
+            <Button type="button" variant="outline" disabled={step === 0 || analyzing}
+              onClick={() => void form.handleSubmit((data) => navigate(step - 1, data))()}>Geri</Button>
+            {step < 3 ? (
+              <Button key="continue" type="button" disabled={analyzing} onClick={(event) => {
+                event.preventDefault();
+                void form.handleSubmit((data) => navigate(step + 1, data))();
+              }}>Devam <ArrowRight /></Button>
+            ) : <Button
+              key="generate"
               type="submit"
               disabled={formState.isSubmitting || analyzing}
               className="text-sm"
@@ -539,18 +605,22 @@ export function ApplicationForm({
               ) : (
                 <FileCheck2 />
               )}
-              İnceleme Raporu Oluştur <ArrowRight />
-            </Button>
+              İnceleme raporu oluştur <ArrowRight />
+            </Button>}
             <Button
+              type="button"
               variant="ghost"
               onClick={() => {
                 form.reset(emptyApplication());
                 setUseAI(false);
                 setAnonymized(false);
                 onClear();
+                setReached(0);
+                setSummary(null);
+                focusStep(0);
                 setFeedback("Form ve rapor temizlendi.");
               }}
-              className="text-xs"
+              className="text-sm"
             >
               <RotateCcw />
               Temizle
@@ -558,7 +628,7 @@ export function ApplicationForm({
           </div>
           <p
             role="status"
-            className="mt-3 text-xs leading-5 text-muted-foreground"
+            className="mt-3 text-sm leading-5 text-muted-foreground"
           >
             {feedback ||
               "Form bilgileri bu sayfanın belleğinde tutulur. AI seçeneği, açıklanan alanları OpenAI’a gönderir."}
@@ -570,12 +640,10 @@ export function ApplicationForm({
 }
 
 function Section({
-  number,
   title,
   icon,
   children,
 }: {
-  number: string;
   title: string;
   icon: ReactNode;
   children: ReactNode;
@@ -586,9 +654,7 @@ function Section({
       <div className="mb-5 flex items-center gap-2.5">
         <span className="section-icon">{icon}</span>
         <h3 className="text-sm font-semibold">{title}</h3>
-        <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-          {number}
-        </span>
+
       </div>
       <div className="space-y-4">{children}</div>
     </fieldset>

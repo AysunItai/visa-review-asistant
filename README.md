@@ -19,10 +19,21 @@ npm run build
 npm start
 ```
 
+## Dört adımlı inceleme akışı
+
+1. **Başvuru ve seyahat:** referans, ülke, amaç, tarihler ve seyahat açıklaması. Süre, tarih farkı olarak gece; her iki tarih dahil olarak takvim günü cinsinden gösterilir.
+2. **Kişisel bilgiler ve seyahat geçmişi:** çalışma, eğitim, seyahat geçmişi, vize/oturum, ret, diller ve akrabalık bilgileri.
+3. **Finansman, konaklama ve belgeler:** bütçe, ödeme yöntemleri, varlıklar, konaklamalar, ilgili açıklamalar ve beyanlar.
+4. **Açıklamalar ve inceleme:** önceki adımların düzenlenebilir özeti, özel inceleme notu, kurgusal alıntılar ve inceleme yöntemi.
+
+Tek React Hook Form durumu kullanılır. Devam yalnızca geçerli adımı, son gönderim tüm etkin formu doğrular. Hatalar ilgili adımda gösterilir ve ilk hatalı alana odaklanılır. Geri dönüşler değerleri korur. Evet/Hayır/Belirtilmedi ayrı değerlerdir; gizlenen cevaplar form belleğinde korunur, doğrulamadan **önce** etkin veriden çıkarılır. Ret açıklaması, akrabalık ilişkisi ve ek akraba açıklaması yerel profil alanlarıdır. Sektör bir çalışma durumu değildir; işsizlik çıkarımı veya sektöre bağlı otomatik alan gizleme yapılmaz.
+
+Başarılı gönderim raporu ana görünümde açar. Başvuruyu düzenle formu koruyarak geri getirir. Düzenleme eski raporu güncel olmaktan çıkarır; kopyalama ve yazdırma kilitlenir. AI hatalarında yerel rapor ve form korunur; onaylı istek için yeniden deneme düğmesi vardır. AI isteği açık alan listesiyle kurulur; profil, özel not ve referans gönderilmez.
+
 ## Demo davranışı
 
 - Next.js App Router, strict TypeScript, Tailwind CSS, özelleştirilmiş shadcn/ui bileşenleri, Lucide, React Hook Form ve Zod kullanır.
-- Üç kurgusal örnek, bugünden 30 gün sonrası için üretilir. Örnek yüklemek raporu otomatik oluşturmaz.
+- Beş kurgusal örnek, bugünden 30 gün sonrası için üretilir: tutarlı, eksik bilgi, konaklama süresi uyuşmazlığı, ters tarihler ve seçilen amaçla çelişen seyahat açıklaması. Örnek yüklemek önceki raporu ve hataları temizler; raporu otomatik oluşturmaz. Ters tarihler ilk adımda düzeltilmelidir; serbest metin çelişkileri isteğe bağlı AI incelemesine bırakılır.
 - İlk örnek: 10 gece / 6 gece kapsam, bütçe farkı ve bir eksik beyan; toplam 3 bulgu. Tutarlı örnek: 0 bulgu. Eksik bilgi örneği: 4 bulgu.
 - Yerel kural bulguları deterministiktir; isteğe bağlı AI gözlemleri ayrı bir bölümde gösterilir ve yerel bulguları değiştirmez. Form bilgileri React belleğinde tutulur. Yenilemek veya **Temizle** işlemi yerel bilgileri siler. AI kullanılırsa aşağıdaki alanlar harici sağlayıcıya gönderilir. `localStorage`, veritabanı, kimlik doğrulama veya belge yükleme yoktur.
 - Form değişince rapor eski olarak işaretlenir. Yeniden oluşturulana kadar kopyalama/yazdırma kapalıdır. Tarayıcının doğrudan yazdırma işleminde de eski raporun içeriği gizlenir.
@@ -32,6 +43,12 @@ npm start
 - Özel inceleme notu yerel kalır; kurallarda değerlendirilmez, AI’a gönderilmez ve kopyalanan rapora dahil edilmez. AI için dört ayrı açıklama alanı vardır. Hassas bilgi girmeyin.
 
 ## Kapsam ve isteğe bağlı AI
+
+### Ek başvuru bilgileri
+
+Form; çalışma sektörü, meslek, medeni durum, işe başlama yılı, yaş, doğum ülkesi, eğitim, ziyaret edilen ülke sayısı ve bölgeler (Schengen Alanı / ABD / Diğer ülkeler), geçerli yabancı vize/oturum ülkeleri, vize reddi ülkeleri, yabancı diller, gidilecek ülkedeki akrabalar, varlık türleri (ev/araba/tarla/arsa) ve ödeme yöntemlerini (kredi/kredi kartı/nakit) toplar. Bu alanlar isteğe bağlıdır. Evet seçilen vize/oturum, ret, dil ve varlık sorularının ayrıntıları istenir; cevap değiştiğinde gizlenen ayrıntılar rapora dahil edilmez. Aynı ülke seyahat sayısında bir kez sayılır. Yaş ve ülke sayısı negatif olmayan tam sayılardır; işe başlama yılı gelecekte olamaz.
+
+Ek bilgiler yalnızca sayfa belleğinde tutulur; insan incelemesi için ekranda, kopyalanan ve yazdırılan raporda gösterilir. Otomatik kural bulgularını değiştirmez ve OpenAI’a gönderilmez. Temizleme ve örnek yükleme bu alanları da sıfırlar/değiştirir.
 
 Varsayılan seçenek **“Yalnızca yerel kontroller”** seçeneğidir; ağ isteği yapmaz. **“Yerel kontroller + OpenAI gözlemleri”** seçeneği ve ayrı gönderim onayıyla analiz düğmesi `POST /api/analyze` çağrısı yapar. Resmî OpenAI JavaScript SDK’sı (`openai`, kilit dosyasında 6.49.0) sunucuda Responses API’yi kullanır: `responses.parse()`, `text.format: zodTextFormat(...)`, `output_parsed`. Sözdizimi [resmî SDK belgeleri](https://developers.openai.com/api/docs/libraries) ve [Structured Outputs kılavuzu](https://developers.openai.com/api/docs/guides/structured-outputs) üzerinden kontrol edildi.
 
@@ -73,17 +90,19 @@ npm run build
 npm run test:browser
 ```
 
-İnceleme motoru için 13, AI entegrasyonu için 9 odaklı test vardır. AI testleri resmî SDK’yı **taklit taşıma katmanıyla** çalıştırır: gerçek API çağrısı veya ücret yoktur. Alan izin listesi, onay, uzunluk sınırları, kanıt eşleşmesi, eksik yapılandırma, zaman aşımı/iptal, sağlayıcı hatası, geçersiz yanıt ve yerel motorun değişmemesi kontrol edilir. Ek saat dilimi kontrolü: `TZ=Europe/Berlin npm test`.
+Bu akış güncellemesinde lint, TypeScript kontrolü, 28 birim testi ve üretim derlemesi geçti. Google Chrome ile 320, 375, 390, 768, 1024 ve 1440 px genişliklerde 48 tarayıcı senaryosu geçti. Adım doğrulaması, değerlerin korunması, koşullu alanlar, AI alan sınırı, örnek yükleme, rapor güncelliği, klavye odağı, kopyalama ve yazdırma görünümü doğrulandı. Masaüstü ve mobil ekran görüntüleri de gözden geçirildi; fiziksel mobil cihaz ve canlı OpenAI çağrısı bu kontrole dahil değildir.
+
+İnceleme motoru, AI entegrasyonu, profil ve adım doğrulaması için odaklı testler vardır. AI testleri resmî SDK’yı **taklit taşıma katmanıyla** çalıştırır: gerçek API çağrısı veya ücret yoktur. Alan izin listesi, onay, uzunluk sınırları, kanıt eşleşmesi, eksik yapılandırma, zaman aşımı/iptal, sağlayıcı hatası, geçersiz yanıt ve yerel motorun değişmemesi kontrol edilir. Ek saat dilimi kontrolü: `TZ=Europe/Berlin npm test`.
 
 Playwright, kurulu Google Chrome'u kullanır ve üretim sunucusunu otomatik başlatır; önce `npm run build` çalıştırın. 320, 375, 390, 768, 1024 ve 1440 px için tanımlı projelerde üç örnek, doğrulama, kopyalama, eski rapor kilidi ve yazdırma senaryoları bulunur. `responsive.spec.ts` ayrıca uzun kurgusal AI metinlerini, konaklama ekleme/kaldırmayı, yüklenme/hata durumlarını, en az 44 px dokunma hedeflerini, en az 16 px alan yazısını, klavye odağını, azaltılmış hareket tercihini ve sayfa taşmasını kontrol etmek üzere hazırlanmıştır. En/boy değişimiyle yatay/dikey düzen ve 1440 px projesinde 720 px yeniden akış da kontrol edilir; bu, gerçek %200 tarayıcı yakınlaştırması değildir. AI senaryoları `/api/analyze` isteğini durdurup sentetik yanıt verir; **canlı sağlayıcıya gitmez**. Onaysız/yerel mod, ayrı AI kartları, hata durumunda yerel rapor ve geç gelen yanıtlar da test edilir. Çıktılar `test-results/` altında oluşur.
 
-**Canlı doğrulama:** Gerçek sağlayıcı isteği yapılmadı; API bağlantısının başarıyla çalıştığı iddia edilmez. Faturalandırılabilecek bir doğrulama yalnızca ayrıca onay alındıktan sonra, sentetik bilgilerle yapılmalıdır. Testlerde gerçek ortam anahtarları okunmaz. Bu ortamda Playwright sunucusunun `127.0.0.1:3000` üzerinde dinlemesi `EPERM` ile engellendi ve Chrome başlatılamadı. Altı genişlik için testler tanımlıdır ancak çalıştırılamadı; görsel tarayıcı doğrulaması yapılmadı. Üretim öncesinde bu testleri izin verilen bir ortamda çalıştırın; ayrıca gerçek %200 yakınlaştırmayı, iOS/Android tarih seçicilerini ve ekran klavyesini fiziksel cihazlarda kontrol edin.
+**Canlı doğrulama:** Gerçek sağlayıcı isteği yapılmadı; API bağlantısının başarıyla çalıştığı iddia edilmez. Faturalandırılabilecek bir doğrulama yalnızca ayrıca onay alındıktan sonra, sentetik bilgilerle yapılmalıdır. Testlerde gerçek ortam anahtarları okunmaz. Tarayıcı testlerinde localhost ve Chrome erişimi için sandbox dışında çalıştırma izni gerekir. AI istekleri bu testlerde taklit edilir; canlı sağlayıcıya gönderilmez. Üretim öncesinde bu testleri izin verilen bir ortamda çalıştırın; ayrıca gerçek %200 yakınlaştırmayı, iOS/Android tarih seçicilerini ve ekran klavyesini fiziksel cihazlarda kontrol edin.
 
 Üretim HTML/JS çıktısı ayrıca JSDOM ortamında çalıştırıldı. Yerel mod, gönderim onayı, istemci → sunucu işleyicisi → resmî SDK akışı (taklit sağlayıcı taşıması), ayrı AI kartları, kopyalama, düzenlemede eski rapor kilidi, eksik yapılandırmada yerel rapor, iptal ve geç yanıtın yok sayılması doğrulandı. Bu kontrol görsel tarayıcı testi veya canlı AI bağlantısı değildir.
 
 ## Duyarlı düzen
 
-- Form ve rapor, çalışma alanının iç genişliği en az 60 rem olduğunda yan yanadır; daha dar alanda alt alta gelir. Okuma alanı sınırlıdır. Form alanları ve rapor ölçütleri kendi kart genişliklerine göre yerleşir.
+- Form ve rapor sırayla, en fazla 1040 px genişliğinde ortalanmış bir alanda gösterilir. Kısa form alanları masaüstünde iki, mobilde tek sütundur. Açıklamalar, koşullu soru grupları ve özetler tam genişliktedir. Mobil adım göstergesi dört numara ve etkin adım başlığı kullanır; yatay kaydırma gerektirmez.
 - 1024 px altında iki gezinme düğmesi üstte, sürekli erişilebilir bir satırdadır; açılır menü veya iletişim kutusu kullanılmaz. Form ve rapor mobilde sabit/yapışkan değildir.
 - Kontroller en az 16 px yazı, düğmeler ve tıklanabilir seçim etiketleri en az 44 px hedef kullanır. Uzun referanslar ve AI metinleri satır kırar; sayfa taşması `overflow-x: hidden` ile gizlenmez.
 - Başarılı yerel analizden sonra rapor başlığına odak ve kaydırma yapılır, tamamlanma duyurulur. Azaltılmış hareket tercihinde yumuşak kaydırma yoktur. Sonradan gelen AI yanıtı odağı yeniden taşımaz. Yazdırma görünümünde yalnızca rapor kalır.

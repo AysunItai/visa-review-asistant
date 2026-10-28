@@ -517,9 +517,13 @@
     padding: 12px;
     border-radius: 6px;
     background: white;
+    opacity: 0;
+    pointer-events: none;
   }
   .skip-link:focus {
     top: 10px;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 /* Use the available content width, not a device label, to split cards. */
@@ -619,6 +623,51 @@
     gap: 8px;
   }
 }
+/* The form and generated report share one centered reading area. */
+.workflow-container, .workflow-heading {
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
+}
+.workflow-container .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.workflow-container .form-section { padding-block: 28px; }
+.workflow-container .sample-controls > button { flex: 0 1 auto; }
+.workflow-container .sample-controls > .select-wrap { flex: 1 1 20rem; }
+.workflow-container .form-section h3 { font-size: 1rem; }
+.workflow-container #form-step-title { scroll-margin-top: 24px; }
+.step-navigation { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.step-navigation ol { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.step-navigation button {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; min-height: 48px;
+  padding: 8px; border-radius: 6px; text-align: left; color: var(--muted-foreground);
+  font-size: 0.8125rem; line-height: 1.5;
+}
+.step-navigation button:disabled { opacity: .65; cursor: default; }
+.step-navigation button[aria-current="step"] { background: var(--primary); color: white; }
+.step-navigation button[aria-current="step"]:focus-visible { outline-offset: 3px; }
+.step-number { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border: 1px solid currentColor; border-radius: 50%; }
+.workflow-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; font-size: .875rem; background: white; }
+.summary-details { display: grid; gap: 12px; font-size: .875rem; line-height: 1.6; }
+.summary-details > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; }
+.summary-details dt { color: var(--muted-foreground); }
+.summary-details dd { white-space: pre-wrap; overflow-wrap: anywhere; }
+.wizard-actions .form-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.wizard-actions .form-actions > button { flex: 0 1 auto; }
+.wizard-actions .form-actions > button:nth-child(2) { margin-left: auto; }
+.workflow-container .report-panel h2 { font-size: 1.125rem; }
+@media (max-width: 699px) {
+  .workflow-container .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .step-navigation { padding: 12px 16px; }
+  .step-navigation ol { gap: 8px; }
+  .step-navigation button { justify-content: center; align-items: center; }
+  .step-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .summary-details > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .wizard-actions .form-actions > button:nth-child(2) { flex: 1; }
+  .wizard-actions .form-actions > button:last-child { flex-basis: 100%; }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -644,13 +693,16 @@
   .workspace-footer,
   .report-actions,
   .report-announcement,
+  .workflow-notice,
+  .step-navigation,
   .skip-link {
     display: none !important;
   }
   .app-shell,
   .main-shell,
   .workspace-main,
-  .workspace-grid {
+  .workspace-grid,
+  .workflow-container {
     display: block;
     margin: 0;
     padding: 0;

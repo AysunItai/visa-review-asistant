@@ -1,4 +1,5 @@
 import { dayNumber, formatDate, formatMoney, formatNumber } from "./dates.ts";
+import { profileEntries } from "./applicant-profile.ts";
 import {
   applicationSchema,
   declarations,
@@ -216,6 +217,12 @@ export function reportText(report: Review): string {
       Object.values(a.declarations).filter(Boolean).length
     } / 4`,
     "Tarihler, konaklama aralıkları, bütçe ve beyan işaretleri kontrol edildi. Ülke yalnızca bağlamdır; serbest açıklama kurallarda değerlendirilmez.",
+    ...(profileEntries(a.profile).length ? [
+      "",
+      "Ek başvuru bilgileri — başvuru sahibinin beyanı",
+      "İnsan incelemesi içindir; otomatik değerlendirmede kullanılmaz ve OpenAI’a gönderilmez.",
+      ...profileEntries(a.profile).map(([label, value]) => `${label}: ${value}`),
+    ] : []),
     "",
     SCOPE_NOTE,
   ].join("\n");

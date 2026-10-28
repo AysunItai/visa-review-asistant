@@ -19,28 +19,21 @@ export function FormField({
 }) {
   return (
     <div className={`min-w-0 space-y-2 ${className}`}>
-      <label
-        htmlFor={id}
-        className="flex flex-wrap items-baseline gap-x-2 text-[13px] font-semibold text-foreground"
-      >
-        {label}
-        {optional && (
-          <span className="text-xs font-normal text-muted-foreground">
-            İsteğe bağlı
-          </span>
-        )}
-      </label>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <label htmlFor={id} className="text-sm font-semibold text-foreground">{label}</label>
+        <span className="text-sm text-muted-foreground">{optional ? "İsteğe bağlı" : "Zorunlu"}</span>
+      </div>
       {children}
       {hint && (
         <p
           id={`${id}-hint`}
-          className="text-xs leading-relaxed text-muted-foreground"
+          className="text-sm leading-relaxed text-muted-foreground"
         >
           {hint}
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} role="alert" className="text-xs text-red-700">
+        <p id={`${id}-error`} role="alert" className="text-sm text-red-700">
           {error}
         </p>
       )}

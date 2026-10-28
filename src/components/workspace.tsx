@@ -13,6 +13,7 @@ import {
 import { ApplicationForm } from "@/components/application-form";
 import { ReviewReport } from "@/components/review-report";
 import { HowItWorks } from "@/components/how-it-works";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { reviewApplication, type Review } from "@/lib/review";
 import { toAIRequest, aiStatusLabel, type AIState } from "@/lib/ai-contract";
@@ -22,6 +23,10 @@ import type { AnalysisOptions } from "@/lib/narratives";
 
 export function Workspace() {
   const [view, setView] = useState<"review" | "how">("review");
+  const [screen, setScreen] = useState<"form" | "report">("form");
+  const [generationError, setGenerationError] = useState("");
+  const [lastOptions, setLastOptions] = useState<AnalysisOptions>({ useAI: false, anonymized: false });
+  const busy = useRef(false);
   const [report, setReport] = useState<Review | null>(null);
   const [stale, setStale] = useState(false);
   const [ai, setAI] = useState<AIState>({ status: "local" });
@@ -32,11 +37,22 @@ export function Workspace() {
     generation.current++;
     controller.current?.abort();
     controller.current = null;
+    busy.current = false;
   }
   function analyze(application: Application, options: AnalysisOptions) {
+    if (busy.current) return;
     cancelPending();
-    setReport(reviewApplication(application));
+    setGenerationError("");
+    try {
+      setReport(reviewApplication(application));
+    } catch {
+      setGenerationError("Rapor oluşturulamadı. Bilgileriniz korundu; inceleme düğmesiyle yeniden deneyebilirsiniz.");
+      setStale(true);
+      return;
+    }
+    setLastOptions(options);
     setStale(false);
+    setScreen("report");
     if (!options.useAI) {
       setAI({ status: "local" });
       return;
@@ -48,10 +64,12 @@ export function Workspace() {
     const current = generation.current;
     const pending = new AbortController();
     controller.current = pending;
+    busy.current = true;
     setAI({ status: "loading" });
     void requestAI(toAIRequest(application), pending.signal).then((result) => {
       if (generation.current !== current || pending.signal.aborted) return;
       controller.current = null;
+      busy.current = false;
       setAI(result);
     });
   }
@@ -121,7 +139,7 @@ export function Workspace() {
         </header>
         <main id="main" tabIndex={-1} className="workspace-main">
           <div hidden={view !== "review"}>
-            <div className="page-heading">
+            <div className="page-heading workflow-heading">
               <div>
                 <div className="eyebrow mb-2">BAŞVURU ÖN İNCELEMESİ</div>
                 <h1 className="page-title">
@@ -139,8 +157,17 @@ export function Workspace() {
                 Form bu oturumda tutulur
               </span>
             </div>
-            <div className="workspace-grid">
+            <div className="workflow-container">
+              <div hidden={screen !== "form"}>
+              {report && (
+                <div role="status" className="workflow-notice">
+                  <p>{stale ? "Bilgiler değişti. Son rapor güncel değil; düzenlemelerden sonra yeniden oluşturun." : "Başvurunuzu düzenliyorsunuz. Son raporunuz hazır."}</p>
+                  <Button variant="outline" onClick={() => setScreen("report")}>Son raporu görüntüle</Button>
+                </div>
+              )}
+              {generationError && <p role="alert" className="workflow-notice text-destructive">{generationError}</p>}
               <ApplicationForm
+                active={screen === "form" && view === "review"}
                 onReview={analyze}
                 analyzing={ai.status === "loading"}
                 onEdited={() => {
@@ -159,7 +186,22 @@ export function Workspace() {
                   setStale(false);
                 }}
               />
-              <ReviewReport report={report} stale={stale} ai={ai} />
+              </div>
+              {screen === "report" && report && (
+                <>
+                  <ReviewReport report={report} stale={stale} ai={ai}
+                    onEdit={() => {
+                      cancelPending();
+                      setAI((previous) => previous.status === "loading" ? { status: "unavailable", reason: "cancelled" } : previous);
+                      setScreen("form");
+                    }} />
+                  {!stale && ai.status === "unavailable" && lastOptions.anonymized && (
+                    <div className="report-actions mt-4">
+                      <Button variant="outline" onClick={() => analyze(report.application, lastOptions)}>Yapay zekâ incelemesini yeniden dene</Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             <footer className="workspace-footer">
               <span>

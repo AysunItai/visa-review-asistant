@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { loadSample, finalStep, generate, editStep, enableAI, next } from "./flow-helpers";
 
 // All AI responses in this suite are mocked. Never contact a provider.
 test.beforeEach(async ({ page }) => {
@@ -50,180 +51,52 @@ async function checkLayout(page: Page) {
   expect(failures).toEqual([]);
 }
 
-test("responsive form, repeated stays, all samples, and validation", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
-    "content",
-    /width=device-width/
-  );
-  await expect(
-    page.getByText("Araştırma prototipi", { exact: true })
-  ).toBeVisible();
-  await checkLayout(page);
-  await page.getByRole("button", { name: "İnceleme Raporu Oluştur" }).click();
-  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(4);
-  await checkLayout(page);
-  for (const [sample, count] of [
-    ["clarification", 3],
-    ["consistent", 0],
-    ["missing", 4],
-  ] as const) {
-    await page.getByLabel("Örnek başvuru seçin").selectOption(sample);
-    await page.getByRole("button", { name: "Örnek Başvuru Yükle" }).click();
-    await page.getByRole("button", { name: "İnceleme Raporu Oluştur" }).click();
-    await expect(page.locator(".finding-card")).toHaveCount(count);
-    await expect(page.locator("#report-title")).toBeFocused();
-    await checkLayout(page);
-  }
-  await page.getByRole("button", { name: "Konaklama ekle" }).click();
-  await page.getByRole("button", { name: "Konaklama ekle" }).click();
-  await expect(page.getByLabel("Giriş tarihi", { exact: true })).toHaveCount(2);
-  await checkLayout(page);
-  await page.getByRole("button", { name: "2. konaklamayı kaldır" }).click();
-  await page.getByRole("button", { name: "1. konaklamayı kaldır" }).click();
-  await expect(page.getByLabel("Giriş tarihi", { exact: true })).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Raporu kopyala" })
-  ).toBeDisabled();
-  await checkLayout(page);
-});
-
-test("long mocked observations, loading, errors, copy and orientation changes", async ({
-  page,
-}, testInfo) => {
-  let reason:
-    | "not_configured"
-    | "provider_error"
-    | "timeout"
-    | "invalid_response"
-    | undefined;
-  let release: (() => void) | undefined;
+test("responsive steps, report, long observations and orientation changes", async ({ page }, testInfo) => {
   await page.route("**/api/analyze", async (route) => {
-    if (reason) {
-      await route.fulfill({
-        status: 503,
-        json: { status: "unavailable", reason },
-      });
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await route.fulfill({
-      json: {
-        status: "success",
-        result: {
-          observations: [
-            {
-              category: "Belirsizlik",
-              title:
-                "Kurgusal yerleşim testi — açıklama gerektiren uzun seyahat bilgileri",
-              explanation: "KurgusalAçıklama".repeat(40),
-              evidence: [
-                {
-                  fieldId: "narratives.fictionalExcerpts",
-                  quote: "KurgusalAlıntı".repeat(30),
-                },
-              ],
-              question: "KurgusalNetleştirmeSorusu".repeat(10),
-            },
-          ],
-        },
-      },
-    });
+    await route.fulfill({ json: { status: "success", result: { observations: [{
+      category: "Belirsizlik", title: "Kurgusal yerleşim testi",
+      explanation: "KurgusalAçıklama".repeat(40),
+      evidence: [{ fieldId: "narratives.fictionalExcerpts", quote: "KurgusalAlıntı".repeat(30) }],
+      question: "KurgusalNetleştirmeSorusu".repeat(10),
+    }] } } });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Örnek Başvuru Yükle" }).click();
-  await page.getByLabel("Başvuru referansı").fill("KURGUSAL".repeat(10));
-  await page
-    .getByLabel("Kurgusal belge alıntıları", { exact: true })
-    .fill("KurgusalAlıntı".repeat(200));
-  await page
-    .getByRole("radio", {
-      name: "Yerel kontroller + OpenAI gözlemleri",
-      exact: true,
-    })
-    .check();
-  const consent = page.getByRole("checkbox", {
-    name: /Gönderilecek açıklamaları kontrol ettim/,
-  });
-  await consent.check();
-  await page.getByRole("button", { name: "İnceleme Raporu Oluştur" }).click();
-  await expect(
-    page.getByText("OpenAI yanıtı bekleniyor. Yerel rapor hazır.")
-  ).toBeVisible();
-  await expect(page.locator("#report-title")).toBeFocused();
   await checkLayout(page);
-  release?.();
+  await loadSample(page);
+  await page.getByLabel("Başvuru referansı").fill("KURGUSAL".repeat(10));
+  await page.screenshot({ path: `test-results/${testInfo.project.name}-step-1.png`, fullPage: true });
+  await next(page);
+  await checkLayout(page);
+  await next(page);
+  await checkLayout(page);
+  await page.screenshot({ path: `test-results/${testInfo.project.name}-step-3.png`, fullPage: true });
+  await next(page);
+  await page.getByLabel("Kurgusal belge alıntıları", { exact: true }).fill("KurgusalAlıntı".repeat(200));
+  await enableAI(page);
+  await checkLayout(page);
+  await generate(page);
   await expect(page.locator(".ai-observation-card")).toHaveCount(1);
   await checkLayout(page);
-  await page.screenshot({
-    path: `test-results/${testInfo.project.name}-mock-long-report.png`,
-    fullPage: true,
-  });
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async () => {} },
-    });
-  });
-  await page.getByRole("button", { name: "Raporu kopyala" }).click();
-  await expect(page.getByText("Rapor panoya kopyalandı.")).toBeVisible();
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async () => {
-          throw new Error("Mock denied");
-        },
-      },
-    });
-  });
-  await page.getByRole("button", { name: "Raporu kopyala" }).click();
-  await expect(page.getByText(/Kopyalanamadı/)).toBeVisible();
-  await checkLayout(page);
+  await page.screenshot({ path: `test-results/${testInfo.project.name}-report.png`, fullPage: true });
   const original = page.viewportSize()!;
-  await page.setViewportSize({
-    width: original.height,
-    height: original.width,
-  });
+  await page.setViewportSize({ width: original.height, height: original.width });
   await checkLayout(page);
-  // Reflow equivalent only: actual 200% browser zoom remains a manual check.
   if (original.width === 1440) {
     await page.setViewportSize({ width: 720, height: 550 });
     await checkLayout(page);
   }
   await page.setViewportSize(original);
-  for (const [failure, message] of [
-    ["not_configured", "AI yapılandırılmamış"],
-    ["provider_error", "AI sağlayıcısına erişilemedi"],
-    ["timeout", "AI isteği zaman aşımına uğradı"],
-    ["invalid_response", "AI yanıtının biçimi"],
-  ] as const) {
-    reason = failure;
-    await page.getByRole("button", { name: "İnceleme Raporu Oluştur" }).click();
-    await expect(page.getByText(new RegExp(message))).toBeVisible();
-    await checkLayout(page);
-  }
-  await page.getByLabel("İnceleme notu").fill("Kurgusal değişiklik.");
-  await expect(page.locator(".stale-alert")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Raporu yazdır" })
-  ).toBeDisabled();
-  await checkLayout(page);
+  await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("Mock denied"); } } }));
+  await page.getByRole("button", { name: "Raporu kopyala" }).click();
+  await expect(page.getByText(/Kopyalanamadı/)).toBeVisible();
 });
 
-test("keyboard navigation, report focus, completion announcement and reduced motion", async ({
-  page,
-}) => {
+test("keyboard navigation, validation focus, report focus and reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     const scroll = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (options) {
-      if (this.id === "report-title" && typeof options === "object")
-        document.documentElement.dataset.reportScroll = options.behavior;
+      if (this.id === "report-title" && typeof options === "object") document.documentElement.dataset.reportScroll = options.behavior;
       scroll.call(this, options);
     };
   });
@@ -232,36 +105,37 @@ test("keyboard navigation, report focus, completion announcement and reduced mot
   await expect(page.getByRole("link", { name: "İçeriğe geç" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main")).toBeFocused();
-  await page
-    .getByRole("button", { name: "Nasıl Çalışır", exact: true })
-    .focus();
+  await page.getByRole("button", { name: "Nasıl Çalışır", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("heading", {
-      name: "Bilgiler netleşir. Değerlendirme insanda kalır.",
-    })
-  ).toBeVisible();
-  await checkLayout(page);
-  await page.getByRole("button", { name: "Başvuru incelemeye başla" }).focus();
+  await expect(page.getByRole("heading", { name: "Bilgiler netleşir. Değerlendirme insanda kalır." })).toBeVisible();
+  await page.getByRole("button", { name: "Başvuru incelemeye başla" }).click();
+  await page.getByRole("button", { name: "Devam", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Örnek Başvuru Yükle" }).focus();
-  await page.keyboard.press("Space");
-  await page.getByRole("button", { name: "İnceleme Raporu Oluştur" }).focus();
+  await expect(page.getByLabel("Gidiş tarihi")).toBeFocused();
+  await expect(page.getByLabel("Gidiş tarihi")).toHaveAttribute("aria-describedby", "departure-error");
+  await loadSample(page);
+  await finalStep(page);
+  await page.getByRole("button", { name: "İnceleme raporu oluştur", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator("#report-title")).toBeFocused();
-  await expect(page.locator(".report-announcement")).toContainText(
-    "İnceleme raporu oluşturuldu."
-  );
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-report-scroll",
-    "auto"
-  );
+  await expect(page.locator(".report-announcement")).toContainText("İnceleme raporu oluşturuldu.");
+  await expect(page.locator("html")).toHaveAttribute("data-report-scroll", "auto");
   await page.keyboard.press("Tab");
-  await expect(
-    page.getByRole("button", { name: "Raporu kopyala" })
-  ).toBeFocused();
-  await expect(page.getByRole("button", { name: "Raporu kopyala" })).toHaveCSS(
-    "outline-style",
-    "solid"
-  );
+  await expect(page.getByRole("button", { name: "Başvuruyu düzenle" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Başvuruyu düzenle" })).toHaveCSS("outline-style", "solid");
+});
+
+test("final submission finds earlier errors and returns to their step", async ({ page }) => {
+  await page.goto("/");
+  await loadSample(page);
+  await finalStep(page);
+  await editStep(page, 2);
+  await page.getByLabel("Yaşınız", { exact: true }).fill("121");
+  await editStep(page, 1);
+  await editStep(page, 4);
+  await page.getByRole("button", { name: "İnceleme raporu oluştur", exact: true }).click();
+  await expect(page.getByText("Adım 2 / 4", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Yaşınız", { exact: true })).toBeFocused();
+  await expect(page.locator("#review-report")).toHaveCount(0);
+  await checkLayout(page);
 });

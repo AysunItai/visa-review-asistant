@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate, formatMoney, formatNumber } from "@/lib/dates";
 import { reportText, SCOPE_NOTE, type Review } from "@/lib/review";
 import { toAmount } from "@/lib/validation";
+import { profileEntries } from "@/lib/applicant-profile";
 import { AIObservations } from "./ai-observations";
 import {
   aiReportText,
@@ -34,10 +35,12 @@ export function ReviewReport({
   report,
   stale,
   ai,
+  onEdit,
 }: {
   report: Review | null;
   stale: boolean;
   ai: AIState;
+  onEdit: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -181,15 +184,15 @@ export function ReviewReport({
                   <item.icon className="size-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-medium">{item.title}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
                     {item.text}
                   </p>
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-9 border-t pt-5 text-xs leading-5 text-muted-foreground">
+          <p className="mt-9 border-t pt-5 text-sm leading-5 text-muted-foreground">
             Başlamak için bir örnek başvuru da yükleyebilirsiniz.
             <br />
             Rapor, siz oluşturduğunuzda hazırlanır.
@@ -209,6 +212,9 @@ export function ReviewReport({
               </span>
             </div>
           )}
+          <div className="report-actions mb-5">
+            <Button type="button" variant="outline" onClick={onEdit}>Başvuruyu düzenle</Button>
+          </div>
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-[1_1_16rem]">
               <div className="eyebrow">ÖN İNCELEME</div>
@@ -219,7 +225,7 @@ export function ReviewReport({
                 {report.application.destination} <span className="px-1">·</span>{" "}
                 {report.application.purpose}
               </p>
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
                 <CalendarDays className="size-3.5" />
                 {formatDate(report.application.departure)} –{" "}
                 {formatDate(report.application.returnDate)}
@@ -250,7 +256,7 @@ export function ReviewReport({
           </div>
           <div
             role="status"
-            className={`report-actions text-xs ${
+            className={`report-actions text-sm ${
               copyStatus?.kind === "error" ? "text-destructive" : "text-success"
             }`}
           >
@@ -259,11 +265,11 @@ export function ReviewReport({
             ) : null}
           </div>
           <div className="mb-5 rounded-lg border border-border bg-white p-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
               <ClipboardList className="size-4" />
               İnceleme özeti
             </div>
-            <p className="text-[13px] leading-[1.8] text-foreground">
+            <p className="text-sm leading-[1.8] text-foreground">
               {report.summary}
             </p>
           </div>
@@ -290,7 +296,7 @@ export function ReviewReport({
           </div>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Yerel kural bulguları</h3>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {formatNumber(report.findings.length)} konu
             </span>
           </div>
@@ -311,21 +317,21 @@ export function ReviewReport({
                     >
                       {finding.category}
                     </Badge>
-                    <span className="font-mono text-[10px] text-muted-foreground">
+                    <span className="font-mono text-sm text-muted-foreground">
                       {finding.ruleId}
                     </span>
                   </div>
                   <h4 className="text-sm font-semibold leading-6">
                     {finding.title}
                   </h4>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  <p className="mt-2 text-sm leading-5 text-muted-foreground">
                     {finding.explanation}
                   </p>
                   <div className="mt-3 border-l-2 border-amber-300 pl-3">
-                    <span className="text-[10px] font-semibold tracking-wider text-muted-foreground">
+                    <span className="text-sm font-semibold tracking-wider text-muted-foreground">
                       DAYANAK
                     </span>
-                    <p className="mt-1 text-[13px] leading-6">
+                    <p className="mt-1 text-sm leading-6">
                       {finding.evidence}
                     </p>
                   </div>
@@ -333,10 +339,10 @@ export function ReviewReport({
                 <div className="flex gap-2 border-t bg-muted px-4 py-3">
                   <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-primary" />
                   <div>
-                    <p className="text-[10px] font-semibold tracking-wider text-primary">
+                    <p className="text-sm font-semibold tracking-wider text-primary">
                       NETLEŞTİRME SORUSU
                     </p>
-                    <p className="mt-1 text-xs leading-5">{finding.question}</p>
+                    <p className="mt-1 text-sm leading-5">{finding.question}</p>
                   </div>
                 </div>
               </article>
@@ -347,7 +353,7 @@ export function ReviewReport({
                 <h4 className="text-sm font-medium">
                   Bu kontrollerde tutarsızlık tespit edilmedi
                 </h4>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                <p className="mt-2 text-sm leading-5 text-muted-foreground">
                   Girilen tarih, bütçe ve beyan bilgileri bu sınırlı kontroller
                   içinde tutarlı. Bu bir vize uygunluk değerlendirmesi değildir.
                 </p>
@@ -355,12 +361,28 @@ export function ReviewReport({
             )}
           </div>
           <AIObservations state={ai} application={report.application} />
+          {profileEntries(report.application.profile).length > 0 && (
+            <section className="mt-6 border-t pt-5" aria-labelledby="profile-summary-title">
+              <h3 id="profile-summary-title" className="text-sm font-semibold">Ek başvuru bilgileri</h3>
+              <p className="my-3 text-sm leading-6 text-muted-foreground">
+                Başvuru sahibinin beyanıdır. İnsan incelemesi içindir; otomatik değerlendirmede kullanılmaz ve OpenAI’a gönderilmez.
+              </p>
+              <dl className="report-details space-y-3 text-sm">
+                {profileEntries(report.application.profile).map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="whitespace-pre-wrap">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
           <div className="mt-6 border-t pt-5">
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <Info className="size-3.5" />
               Kullanılan bilgiler
             </h3>
-            <dl className="report-details space-y-2 text-xs">
+            <dl className="report-details space-y-2 text-sm">
               <div>
                 <dt className="text-muted-foreground">Beyan edilen bütçe</dt>
                 <dd>
@@ -396,7 +418,7 @@ export function ReviewReport({
                 </dd>
               </div>
             </dl>
-            <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+            <p className="mt-3 text-sm leading-5 text-muted-foreground">
               Tarihler, konaklama aralıkları, bütçe ve beyan işaretleri
               kullanıldı. Ülke yalnızca bağlamdır. Serbest açıklama kurallarda
               değerlendirilmez.
@@ -405,14 +427,14 @@ export function ReviewReport({
         </div>
       )}
       <div className="report-scope border-t bg-muted px-6 py-5">
-        <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
           <ShieldCheck className="size-4 text-primary" />
           İnsan değerlendirmesini destekler
         </div>
-        <p className="text-[11px] leading-[1.8] text-muted-foreground">
+        <p className="text-sm leading-[1.8] text-muted-foreground">
           {SCOPE_NOTE}
         </p>
-        <span className="mt-3 inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+        <span className="mt-3 inline-flex items-center gap-1 text-sm text-muted-foreground">
           {aiStatusLabel(ai)} <ArrowUpRight className="size-3" />
         </span>
       </div>
@@ -431,13 +453,13 @@ function Metric({
 }) {
   return (
     <div className="metric">
-      <div className="text-xs font-medium leading-5 text-muted-foreground">
+      <div className="text-sm font-medium leading-5 text-muted-foreground">
         {label}
       </div>
       <div className="mt-2 text-lg font-semibold tracking-tight sm:text-[22px]">
         {value}
       </div>
-      <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+      <p className="mt-1 text-sm leading-5 text-muted-foreground">
         {detail}
       </p>
     </div>
