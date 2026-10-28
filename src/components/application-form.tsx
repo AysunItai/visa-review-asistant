@@ -188,6 +188,9 @@ export function ApplicationForm({
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{sampleDescriptions[sample]}</p>
       </div>
       <form
+        // Firefox can restore enabled/checked states before React hydrates.
+        // This session-only form must always start from its server-rendered state.
+        autoComplete="off"
         noValidate
         onSubmit={(event) => void form.handleSubmit(submit)(event)}
         onChange={(event) => {
