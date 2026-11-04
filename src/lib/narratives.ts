@@ -20,7 +20,7 @@ export const emptyNarratives = () => ({
 });
 export interface AnalysisOptions {
   useAI: boolean;
-  anonymized: boolean;
+  consented: boolean;
 }
 
 /** Conservative backstop, not a complete personal-information detector. */

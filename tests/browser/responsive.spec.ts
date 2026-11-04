@@ -1,3 +1,4 @@
+import { assessmentFixture } from "../fixtures/assessment";
 import { test, expect, type Page } from "@playwright/test";
 import { loadSample, finalStep, generate, editStep, enableAI, next } from "./flow-helpers";
 
@@ -53,12 +54,12 @@ async function checkLayout(page: Page) {
 
 test("responsive steps, report, long observations and orientation changes", async ({ page }, testInfo) => {
   await page.route("**/api/analyze", async (route) => {
-    await route.fulfill({ json: { status: "success", result: { observations: [{
-      category: "Belirsizlik", title: "Kurgusal yerleşim testi",
+    await route.fulfill({ json: { status: "success", result: assessmentFixture({ overallAssessment: "clarification_required", findings: [{
+      category: "Belirsizlik", priority: "medium", title: "Kurgusal yerleşim testi",
       explanation: "KurgusalAçıklama".repeat(40),
-      evidence: [{ fieldId: "narratives.fictionalExcerpts", quote: "KurgusalAlıntı".repeat(30) }],
-      question: "KurgusalNetleştirmeSorusu".repeat(10),
-    }] } } });
+      evidence: [{ fieldId: "narratives.fictionalExcerpts", value: "KurgusalAlıntı".repeat(30) }],
+      clarificationQuestion: "KurgusalNetleştirmeSorusu".repeat(10),
+    }] }) } });
   });
   await page.goto("/");
   await checkLayout(page);

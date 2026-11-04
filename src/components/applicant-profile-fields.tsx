@@ -66,7 +66,7 @@ export function ApplicantProfileFields({ form, group }: {
   if (group === "personal") return (
     <>
       <p className="text-sm leading-6 text-muted-foreground">
-        Bu bilgiler zorunludur ve insan incelemesi için rapora eklenir; OpenAI’a gönderilmez.
+        Bu bilgiler zorunludur ve rapora eklenir. AI seçeneği ve onayınızla uygulanabilir tüm yanıtlar OpenAI’a gönderilir.
       </p>
       <div className="form-grid">
         {select("employmentSector", employmentSectors)}
@@ -87,7 +87,7 @@ export function ApplicantProfileFields({ form, group }: {
       {profile.hasValidVisaOrResidence === "Evet" && input("visaOrResidenceCountries", { max: 500, hint: "Ülkeleri virgülle ayırın. Vize veya oturum izni olduğunu belirtebilirsiniz." })}
       {select("hasVisaRefusal", ["Evet", "Hayır"])}
       {profile.hasVisaRefusal === "Evet" && input("visaRefusalCountries", { max: 500, hint: "Ülkeleri virgülle ayırın." })}
-      {profile.hasVisaRefusal === "Evet" && input("refusalExplanation", { max: 1000, hint: "Ret gerekçesini veya açıklamanızı yazın. Bu bilgi yalnızca yerel rapora eklenir." })}
+      {profile.hasVisaRefusal === "Evet" && input("refusalExplanation", { max: 1000, hint: "Ret gerekçesini veya açıklamanızı yazın. AI seçeneği ve onayınızla bu açıklama da OpenAI’a gönderilir." })}
       {select("hasForeignLanguages", ["Evet", "Hayır"])}
       {profile.hasForeignLanguages === "Evet" && input("foreignLanguages", { hint: "Örn. İngilizce, Almanca." })}
       {select("hasRelativesAtDestination", ["Evet", "Hayır"])}

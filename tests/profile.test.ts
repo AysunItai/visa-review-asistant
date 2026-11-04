@@ -42,7 +42,7 @@ test("yes answers require details and hidden answers cannot enter the report", (
   assert.ok(!reportText(reviewApplication(parsed)).includes("Japonya"));
 });
 
-test("profile survives review and copy without affecting findings or AI requests", () => {
+test("profile survives review and copy without affecting deterministic findings and is included in AI requests", () => {
   const sample = getSample("consistent");
   const baseline = { ...sample, profile: { ...sample.profile, occupation: "Mimar", hasAssets: "Hayır" as const } };
   const report = reviewApplication(sample);
@@ -50,7 +50,8 @@ test("profile survives review and copy without affecting findings or AI requests
   assert.deepEqual(report.findings, reviewApplication(baseline).findings);
   assert.match(reportText(report), /Mesleğiniz: Yazılım geliştirici/);
   assert.match(reportText(report), /Varlık türleri: Ev, Araba/);
-  assert.deepEqual(toAIRequest(sample), toAIRequest(baseline));
+  assert.notDeepEqual(toAIRequest(sample), toAIRequest(baseline));
+  assert.equal(toAIRequest(sample).application.profile.occupation, sample.profile.occupation);
   assert.ok(aiRequestSchema.safeParse(toAIRequest(sample)).success);
   assert.equal(aiRequestSchema.safeParse({ ...toAIRequest(sample), profile: sample.profile }).success, false);
 });

@@ -365,7 +365,7 @@ export function ReviewReport({
             <section className="mt-6 border-t pt-5" aria-labelledby="profile-summary-title">
               <h3 id="profile-summary-title" className="text-sm font-semibold">Ek başvuru bilgileri</h3>
               <p className="my-3 text-sm leading-6 text-muted-foreground">
-                Başvuru sahibinin beyanıdır. İnsan incelemesi içindir; otomatik değerlendirmede kullanılmaz ve OpenAI’a gönderilmez.
+                Başvuru sahibinin beyanıdır. AI seçeneği ve onayınızla uygulanabilir tüm başvuru yanıtları değerlendirmeye dahil edilir.
               </p>
               <dl className="report-details space-y-3 text-sm">
                 {profileEntries(report.application.profile).map(([label, value]) => (

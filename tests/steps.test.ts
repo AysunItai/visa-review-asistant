@@ -70,8 +70,8 @@ test("blocking conditional/year errors map to their step, while examples keep cl
   assert.equal(conflict.purpose, "Turizm");
   assert.match(conflict.narratives.travelPurpose, /iş toplantılarına/);
   assert.ok(applicationSchema.safeParse(conflict).success);
-  assert.deepEqual(Object.keys(toAIRequest(conflict)).sort(), ["anonymized", "context", "narratives"]);
-  Object.assign(conflict.narratives, { hiddenProfile: "local-only" });
+  assert.deepEqual(Object.keys(toAIRequest(conflict)).sort(), ["application", "consent"]);
+  Object.assign(conflict, { uiState: "local-only" });
   Object.assign(conflict.declarations, { hiddenProfile: "local-only" });
   assert.ok(!JSON.stringify(toAIRequest(conflict)).includes("local-only"));
 });

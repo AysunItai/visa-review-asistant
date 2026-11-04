@@ -25,7 +25,7 @@ export function Workspace() {
   const [view, setView] = useState<"review" | "how">("review");
   const [screen, setScreen] = useState<"form" | "report">("form");
   const [generationError, setGenerationError] = useState("");
-  const [lastOptions, setLastOptions] = useState<AnalysisOptions>({ useAI: false, anonymized: false });
+  const [lastOptions, setLastOptions] = useState<AnalysisOptions>({ useAI: false, consented: false });
   const busy = useRef(false);
   const [report, setReport] = useState<Review | null>(null);
   const [stale, setStale] = useState(false);
@@ -57,7 +57,7 @@ export function Workspace() {
       setAI({ status: "local" });
       return;
     }
-    if (!options.anonymized) {
+    if (!options.consented) {
       setAI({ status: "unavailable", reason: "consent_required" });
       return;
     }
@@ -195,7 +195,7 @@ export function Workspace() {
                       setAI((previous) => previous.status === "loading" ? { status: "unavailable", reason: "cancelled" } : previous);
                       setScreen("form");
                     }} />
-                  {!stale && ai.status === "unavailable" && lastOptions.anonymized && (
+                  {!stale && ai.status === "unavailable" && lastOptions.consented && (
                     <div className="report-actions mt-4">
                       <Button variant="outline" onClick={() => analyze(report.application, lastOptions)}>Yapay zekâ incelemesini yeniden dene</Button>
                     </div>

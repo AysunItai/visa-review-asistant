@@ -66,7 +66,7 @@ export const applicationSchema = z
               message: "Çıkış tarihi giriş tarihinden sonra olmalı.",
             });
         })
-    ),
+    ).max(20, "En fazla 20 konaklama ekleyin."),
     declarations: z.object({
       identity: declaration,
       itinerary: declaration,

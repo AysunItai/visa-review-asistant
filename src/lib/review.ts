@@ -226,7 +226,7 @@ export function reportText(report: Review): string {
     ...(profileEntries(a.profile).length ? [
       "",
       "Ek başvuru bilgileri — başvuru sahibinin beyanı",
-      "İnsan incelemesi içindir; otomatik değerlendirmede kullanılmaz ve OpenAI’a gönderilmez.",
+      "Başvuru sahibinin beyanıdır; AI seçeneği ve onayınızla uygulanabilir tüm yanıtlar değerlendirmeye dahil edilir.",
       ...profileEntries(a.profile).map(([label, value]) => `${label}: ${value}`),
     ] : []),
     "",

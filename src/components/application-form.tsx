@@ -63,7 +63,7 @@ export function ApplicationForm({
   const [sample, setSample] = useState<SampleKey>("clarification");
   const [feedback, setFeedback] = useState("");
   const [useAI, setUseAI] = useState(false);
-  const [anonymized, setAnonymized] = useState(false);
+  const [consented, setConsented] = useState(false);
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const [summary, setSummary] = useState<Application | null>(null);
@@ -132,11 +132,11 @@ export function ApplicationForm({
     form.clearErrors();
     const result = applicationSchema.safeParse(data);
     if (!result.success) { showErrors(result.error.issues, true); return; }
-    onReview(result.data, { useAI, anonymized });
+    onReview(result.data, { useAI, consented });
   }
   function loadSample() {
     form.reset(getSample(sample));
-    setAnonymized(false);
+    setConsented(false);
     setUseAI(false);
     setReached(0);
     setSummary(null);
@@ -200,7 +200,7 @@ export function ApplicationForm({
               event.target.name === "ai-consent"
             )
           )
-            setAnonymized(false);
+            setConsented(false);
           onEdited();
           setFeedback("");
         }}
@@ -414,7 +414,7 @@ export function ApplicationForm({
                   onClick={() => {
                     remove(index);
                     form.clearErrors("stays");
-                    setAnonymized(false);
+                    setConsented(false);
                     onEdited();
                   }}
                 >
@@ -470,7 +470,7 @@ export function ApplicationForm({
             onClick={() => {
               append({ type: "Otel", checkIn: "", checkOut: "" });
               form.clearErrors("stays");
-              setAnonymized(false);
+              setConsented(false);
               onEdited();
             }}
           >
@@ -525,7 +525,7 @@ export function ApplicationForm({
             id="notes"
             label="İnceleme notu"
             error={error("notes")}
-            hint="Yalnızca bu çalışma alanında kalır; OpenAI’a ve kopyalanan rapora eklenmez. Pasaport numarası veya hassas kişisel bilgi girmeyin."
+            hint="AI seçeneği ve onayınızla bu not da OpenAI’a gönderilir. Kimlik/pasaport numarası veya ilgisiz kişisel bilgi girmeyin."
           >
             <textarea
               {...register("notes")}
@@ -554,7 +554,7 @@ export function ApplicationForm({
                 checked={!useAI}
                 onChange={() => {
                   setUseAI(false);
-                  setAnonymized(false);
+                  setConsented(false);
                 }}
                 className="mt-0.5 size-5 shrink-0 accent-accent"
               />
@@ -568,29 +568,30 @@ export function ApplicationForm({
                 onChange={() => setUseAI(true)}
                 className="mt-0.5 size-5 shrink-0 accent-accent"
               />
-              Yerel kontroller + OpenAI gözlemleri
+              Yerel kontroller + AI Ön Değerlendirme
             </label>
             <p className="text-sm leading-6 text-muted-foreground">
-              AI seçildiğinde ülke, seyahat amacı, tarihler, bütçe, konaklama
-              kayıtları, beyan işaretleri; seyahat amacı, finansman, konaklama
-              açıklamaları ve kurgusal belge alıntıları harici
-              sağlayıcı OpenAI’a gönderilir. Başvuru referansı ve özel inceleme
-              notu; kişisel/çalışma bilgileri, seyahat geçmişi, yurt dışı bağlantıları,
-              varlıklar ve ödeme yöntemleri gönderilmez. Sağlayıcının veri işleme koşulları geçerlidir.
-              İstek API kullanım ücreti doğurabilir.
+              AI seçeneğini seçip onay verdiğinizde, uygulanabilir tüm başvuru
+              yanıtlarınız analiz için OpenAI’a gönderilir: referans, kişisel bilgiler,
+              eğitim ve çalışma bilgileri, seyahat ve vize/ret geçmişi, diller,
+              akrabalar, bütçe, ödeme yöntemleri, varlıklar, konaklama, belge
+              beyanları ve inceleme notu dahil tüm açıklamalar. Gizlenen koşullu
+              yanıtlar gönderilmez. Kimlik/pasaport numarası veya ilgisiz iletişim
+              bilgisi yazmayın. Sağlayıcının veri işleme koşulları geçerlidir;
+              istek API kullanım ücreti doğurabilir. Yerel kontrol seçeneği dışarıya bilgi göndermez.
             </p>
             {useAI && (
               <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-sm leading-5">
                 <input
                   type="checkbox"
                   name="ai-consent"
-                  checked={anonymized}
-                  onChange={(event) => setAnonymized(event.target.checked)}
+                  checked={consented}
+                  onChange={(event) => setConsented(event.target.checked)}
                   className="mt-0.5 size-5 shrink-0 accent-accent"
                 />
-                Gönderilecek açıklamaları kontrol ettim; ad, kimlik/pasaport
-                numarası veya ilgisiz kişisel bilgi içermiyor. Bu alanların
-                OpenAI’a gönderilmesini onaylıyorum.
+                Gönderilecek tüm başvuru yanıtlarını kontrol ettim. Kişisel profilim,
+                seyahat/finansman bilgilerim ve inceleme notum dahil uygulanabilir tüm
+                yanıtlarımın ön değerlendirme için OpenAI’a gönderilmesini onaylıyorum.
               </label>
             )}
           </fieldset>
@@ -624,7 +625,7 @@ export function ApplicationForm({
               onClick={() => {
                 form.reset(emptyApplication());
                 setUseAI(false);
-                setAnonymized(false);
+                setConsented(false);
                 onClear();
                 setReached(0);
                 setSummary(null);
@@ -642,7 +643,7 @@ export function ApplicationForm({
             className="mt-3 text-sm leading-5 text-muted-foreground"
           >
             {feedback ||
-              "Form bilgileri bu sayfanın belleğinde tutulur. AI seçeneği, açıklanan alanları OpenAI’a gönderir."}
+              "Form bilgileri bu sayfanın belleğinde tutulur. AI seçeneği ve onayınız, uygulanabilir tüm yanıtları OpenAI’a gönderir."}
           </p>
         </div>
       </form>

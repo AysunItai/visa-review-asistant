@@ -25,6 +25,6 @@ export async function editStep(page: Page, step: number) {
   await expect(page.getByText(`Adım ${step} / 4`, { exact: true })).toBeVisible();
 }
 export async function enableAI(page: Page) {
-  await page.getByRole("radio", { name: "Yerel kontroller + OpenAI gözlemleri", exact: true }).check();
-  await page.getByRole("checkbox", { name: /Gönderilecek açıklamaları kontrol ettim/ }).check();
+  await page.getByRole("radio", { name: "Yerel kontroller + AI Ön Değerlendirme", exact: true }).check();
+  await page.getByRole("checkbox", { name: /Gönderilecek tüm başvuru yanıtlarını kontrol ettim/ }).check();
 }

@@ -71,8 +71,8 @@ export function HowItWorks({ onStart }: { onStart: () => void }) {
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">
             Form bilgileri bu sayfanın belleğinde tutulur; yenilemede silinir.
-            AI seçeneği ve gönderim onayıyla, belirtilen seyahat alanları ve
-            anonim açıklamalar OpenAI’a gönderilir. Yerel seçenek dışarıya bilgi
+            AI seçeneği ve gönderim onayıyla, kişisel profil, seyahat, finansman ve
+            inceleme notu dahil uygulanabilir tüm başvuru yanıtları OpenAI’a gönderilir. Yerel seçenek dışarıya bilgi
             göndermez. Belge yüklenmez ve beyanların gerçekliği doğrulanmaz.
           </p>
         </div>
@@ -83,8 +83,8 @@ export function HowItWorks({ onStart }: { onStart: () => void }) {
         </h2>
         <p>
           OpenAI, verilen metinlerdeki çelişkiler, eksik açıklamalar ve
-          belirsizlikler için ek gözlemler üretebilir. Her gözlem kaynak alanı,
-          alıntı ve netleştirme sorusuyla ayrı gösterilir. AI hata yapabilir;
+          belirsizlikler için ek gözlemler üretebilir. AI Ön Değerlendirme; genel durum, öncelikli konular,
+          gönderilen dayanaklar, netleştirme soruları, tutarlı noktalar ve sınırları gösterir. AI hata yapabilir;
           metinler insan tarafından doğrulanmalıdır. Bağlantı veya yanıt sorunu
           olduğunda yerel rapor kullanılabilir. Kişisel risk puanı, güvenilirlik
           yargısı veya vize sonucu tahmini üretilmez.

@@ -14,8 +14,8 @@ test("reload resets form controls without hydration errors or unlocked steps", a
   await finalStep(page);
   const steps = page.locator(".step-navigation button");
   for (let index = 0; index < 4; index++) await expect(steps.nth(index)).toBeEnabled();
-  await page.getByRole("radio", { name: "Yerel kontroller + OpenAI gözlemleri", exact: true }).check();
-  await page.getByRole("checkbox", { name: /Gönderilecek açıklamaları kontrol ettim/ }).check();
+  await page.getByRole("radio", { name: "Yerel kontroller + AI Ön Değerlendirme", exact: true }).check();
+  await page.getByRole("checkbox", { name: /Gönderilecek tüm başvuru yanıtlarını kontrol ettim/ }).check();
 
   await page.reload();
   await expect(page.getByText("Adım 1 / 4", { exact: true })).toBeVisible();
