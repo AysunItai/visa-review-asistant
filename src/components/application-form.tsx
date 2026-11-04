@@ -148,11 +148,11 @@ export function ApplicationForm({
     const path = `narratives.${key}` as const;
     const field = narrativeFields[key];
     return (
-      <FormField id={path} label={field.label} optional error={error(path)}
+      <FormField id={path} label={field.label} error={error(path)}
         hint={key === "fictionalExcerpts"
           ? "Yalnızca kurgusal belge metni girin. Yapay zekâ incelemesini seçip onay verirseniz OpenAI’a gönderilir."
           : "Yapay zekâ incelemesini seçip onay verirseniz bu açıklama OpenAI’a gönderilir. Kişi adı, kimlik veya iletişim bilgisi eklemeyin."}>
-        <textarea {...register(path)} {...accessible(path, true)} rows={3} maxLength={field.limit}
+        <textarea required {...register(path)} {...accessible(path, true)} rows={3} maxLength={field.limit}
           className="field-control min-h-24 resize-y py-3" />
       </FormField>
     );
@@ -230,12 +230,12 @@ export function ApplicationForm({
           <FormField
             id="reference"
             label="Başvuru referansı"
-            optional
             error={error("reference")}
             hint="Tam ad yerine bir takip kodu kullanın."
           >
             <Input
               {...register("reference")}
+              required
               {...accessible("reference", true)}
               placeholder="Örn. BSV-2026-014"
               maxLength={80}
@@ -394,7 +394,7 @@ export function ApplicationForm({
                 Konaklama bilgisi henüz girilmedi
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Bilgi olmadan da incelemeye devam edebilirsiniz.
+                {nights === 0 ? "Aynı gün dönülen seyahatlerde konaklama kaydı gerekmez." : "Devam etmek için en az bir konaklama ekleyin."}
               </p>
             </div>
           )}
@@ -413,6 +413,7 @@ export function ApplicationForm({
                   aria-label={`${index + 1}. konaklamayı kaldır`}
                   onClick={() => {
                     remove(index);
+                    form.clearErrors("stays");
                     setAnonymized(false);
                     onEdited();
                   }}
@@ -465,8 +466,10 @@ export function ApplicationForm({
           <Button
             variant="outline"
             size="sm"
+            {...accessible("stays")}
             onClick={() => {
               append({ type: "Otel", checkIn: "", checkOut: "" });
+              form.clearErrors("stays");
               setAnonymized(false);
               onEdited();
             }}
@@ -474,6 +477,7 @@ export function ApplicationForm({
             <Plus />
             Konaklama ekle
           </Button>
+          {error("stays") && <p id="stays-error" role="alert" className="text-sm text-red-700">{error("stays")}</p>}
           <p className="text-sm leading-5 text-muted-foreground">
             Çıkış günü gece sayısına dahil edilmez. Aynı gün dönülen
             seyahatlerde konaklama gecesi yoktur.
@@ -482,26 +486,30 @@ export function ApplicationForm({
         <div className="px-4 pb-6 sm:px-6">{narrative("accommodation")}</div>
         <Section title="Belge durumu" icon={<FileCheck2 />}>
           <p className="text-sm leading-5 text-muted-foreground">
-            Yalnızca başvuru sahibinin bilgi beyanını işaretleyin. İşaretleme isteğe bağlıdır; eksik beyanlar raporda netleştirme sorusu olarak gösterilir.
+            Devam etmek için tüm beyanlar zorunludur. Yalnızca başvuru sahibinin verdiği bilgileri işaretleyin; eksik bilgileri önce tamamlayın.
           </p>
           <div className="space-y-1">
             {(
               Object.keys(declarations) as (keyof Application["declarations"])[]
             ).map((key) => (
-              <label
-                key={key}
-                className="choice-label flex cursor-pointer items-center gap-3 rounded-md py-2 text-sm leading-5"
-              >
-                <span className="relative flex size-4 shrink-0 items-center justify-center">
-                  <input
-                    type="checkbox"
-                    {...register(`declarations.${key}`)}
-                    className="peer size-4 appearance-none rounded border border-border bg-white checked:border-accent checked:bg-accent"
-                  />
-                  <Check className="pointer-events-none absolute size-3 text-white opacity-0 peer-checked:opacity-100" />
-                </span>
-                {declarations[key]}
-              </label>
+              <div key={key}>
+                <label
+                  className="choice-label flex cursor-pointer items-center gap-3 rounded-md py-2 text-sm leading-5"
+                >
+                  <span className="relative flex size-4 shrink-0 items-center justify-center">
+                    <input
+                      type="checkbox"
+                      required
+                      {...register(`declarations.${key}`)}
+                      {...accessible(`declarations.${key}`)}
+                      className="peer size-4 appearance-none rounded border border-border bg-white checked:border-accent checked:bg-accent"
+                    />
+                    <Check className="pointer-events-none absolute size-3 text-white opacity-0 peer-checked:opacity-100" />
+                  </span>
+                  {declarations[key]}
+                </label>
+                {error(`declarations.${key}`) && <p id={`declarations.${key}-error`} role="alert" className="text-sm text-red-700">{error(`declarations.${key}`)}</p>}
+              </div>
             ))}
           </div>
           <p className="text-sm leading-5 text-muted-foreground">
@@ -516,16 +524,16 @@ export function ApplicationForm({
           <FormField
             id="notes"
             label="İnceleme notu"
-            optional
             error={error("notes")}
             hint="Yalnızca bu çalışma alanında kalır; OpenAI’a ve kopyalanan rapora eklenmez. Pasaport numarası veya hassas kişisel bilgi girmeyin."
           >
             <textarea
               {...register("notes")}
+              required
               {...accessible("notes", true)}
               rows={3}
               maxLength={2000}
-              placeholder="Netleştirmek istediğiniz bir ayrıntı varsa buraya yazın…"
+              placeholder="İnceleme notunuzu buraya yazın…"
               className="field-control min-h-24 resize-y py-3"
             />
             <p className="text-right text-sm text-muted-foreground">

@@ -27,7 +27,7 @@ test("reload resets form controls without hydration errors or unlocked steps", a
   for (let index = 1; index < 4; index++) await expect(steps.nth(index)).toBeDisabled();
   await expect(page.getByRole("button", { name: "Geri", exact: true })).toBeDisabled();
   await next(page);
-  await expect(page.getByLabel("Gidiş tarihi")).toBeFocused();
+  await expect(page.getByLabel("Başvuru referansı")).toBeFocused();
   await expect(page.locator("#review-report")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

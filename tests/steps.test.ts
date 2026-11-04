@@ -9,7 +9,8 @@ import { reportText, reviewApplication } from "../src/lib/review.ts";
 
 test("step validation only checks the active step and does not mutate raw answers", () => {
   const data = emptyApplication();
-  Object.assign(data, { departure: "2026-11-10", returnDate: "2026-11-12" });
+  Object.assign(data, { reference: "TEST", departure: "2026-11-10", returnDate: "2026-11-12" });
+  data.narratives.travelPurpose = "Kurgusal turistik gezi.";
   data.profile.age = "invalid";
   data.notes = "a".repeat(2001);
   const snapshot = structuredClone(data);
@@ -26,10 +27,10 @@ test("step validation only checks the active step and does not mutate raw answer
 test("inactive malformed and oversized details are excluded before validation and export", () => {
   const data = getSample("consistent");
   Object.assign(data.profile, {
-    hasValidVisaOrResidence: "", visaOrResidenceCountries: "a".repeat(501),
+    hasValidVisaOrResidence: "Hayır", visaOrResidenceCountries: "a".repeat(501),
     hasVisaRefusal: "Hayır", visaRefusalCountries: "a".repeat(501), refusalExplanation: "a".repeat(1001),
     hasForeignLanguages: "Hayır", foreignLanguages: "a".repeat(201),
-    hasRelativesAtDestination: "", relativeRelationship: "a".repeat(201), relativesDetails: "a".repeat(1001),
+    hasRelativesAtDestination: "Hayır", relativeRelationship: "a".repeat(201), relativesDetails: "a".repeat(1001),
     hasAssets: "Hayır", assets: ["invalid"],
   });
   const original = structuredClone(data);

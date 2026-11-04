@@ -10,9 +10,9 @@ export const sampleLabels = {
 } as const;
 export type SampleKey = keyof typeof sampleLabels;
 export const sampleDescriptions: Record<SampleKey, string> = {
-  clarification: "10 gecelik seyahat için 6 gece konaklama girilmiştir. Bütçe ve bir beyan da netleştirme gerektirir.",
+  clarification: "10 gecelik seyahat için 6 gece konaklama girilmiştir. Bütçe de netleştirme gerektirir.",
   consistent: "Seyahat tarihleri, konaklama kapsamı ve bütçesi birbiriyle uyumlu kurgusal örnek.",
-  missing: "Konaklama kaydı ve bazı beyanlar eksiktir. Eksikler raporda sorularla gösterilir.",
+  missing: "Kişisel bilgiler, açıklamalar, konaklama ve bazı beyanlar eksiktir. Devam etmek için zorunlu alanları tamamlayın.",
   dateConflict: "Dönüş tarihi gidişten öncedir. İlk adımda düzeltmeden ilerlenemez.",
   purposeConflict: "Turizm seçilmiştir; açıklama yalnızca iş toplantılarını anlatır. Bu metin çelişkisi isteğe bağlı yapay zekâ incelemesinde ele alınabilir; yerel kurallar serbest metni yorumlamaz.",
 };
@@ -22,6 +22,7 @@ export function getSample(key: SampleKey, today = todayDate()): Application {
   const base: Application = {
     ...emptyApplication(),
     reference: "ÖRNEK-001",
+    notes: "Kurgusal başvurunun tarih, bütçe ve konaklama bilgilerini kontrol edin.",
     departure,
     returnDate,
     budget: "1800",
@@ -58,7 +59,7 @@ export function getSample(key: SampleKey, today = todayDate()): Application {
     declarations: {
       identity: true,
       itinerary: true,
-      budget: false,
+      budget: true,
       accommodation: true,
     },
     stays: [

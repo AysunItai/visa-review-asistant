@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   applicationSchema,
+  requireAccommodation,
   declarations,
   type Application,
 } from "./validation.ts";
@@ -22,6 +23,7 @@ export const contextSchema = z
     declarations: shape.declarations.strict(),
   })
   .superRefine((data, ctx) => {
+    requireAccommodation(data, ctx);
     if (dayNumber(data.returnDate) < dayNumber(data.departure))
       ctx.addIssue({
         code: "custom",

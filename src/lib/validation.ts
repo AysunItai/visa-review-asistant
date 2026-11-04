@@ -35,10 +35,19 @@ const amount = z
     "0 veya daha büyük, en fazla iki ondalıklı geçerli bir tutar girin (en fazla 1 trilyon)."
   );
 export const toAmount = (value: string) => Number(value.replace(",", "."));
+const declaration = z.boolean().refine((value) => value, "Bu beyanı işaretleyin.");
+
+export function requireAccommodation(
+  data: { departure: string; returnDate: string; stays: unknown[] },
+  ctx: z.RefinementCtx
+) {
+  if (dayNumber(data.returnDate) > dayNumber(data.departure) && !data.stays.length)
+    ctx.addIssue({ code: "custom", path: ["stays"], message: "En az bir konaklama ekleyin." });
+}
 
 export const applicationSchema = z
   .object({
-    reference: z.string().max(80, "Referans en fazla 80 karakter olabilir."),
+    reference: z.string().trim().min(1, "Başvuru referansını girin.").max(80, "Referans en fazla 80 karakter olabilir."),
     destination: z.enum(destinations),
     purpose: z.enum(purposes),
     departure: date,
@@ -59,16 +68,17 @@ export const applicationSchema = z
         })
     ),
     declarations: z.object({
-      identity: z.boolean(),
-      itinerary: z.boolean(),
-      budget: z.boolean(),
-      accommodation: z.boolean(),
+      identity: declaration,
+      itinerary: declaration,
+      budget: declaration,
+      accommodation: declaration,
     }),
-    notes: z.string().max(2000, "Açıklama en fazla 2.000 karakter olabilir."),
+    notes: z.string().trim().min(1, "İnceleme notunu girin.").max(2000, "Açıklama en fazla 2.000 karakter olabilir."),
     narratives: narrativeSchema,
     profile: profileSchema,
   })
   .superRefine((data, ctx) => {
+    requireAccommodation(data, ctx);
     if (dayNumber(data.returnDate) < dayNumber(data.departure))
       ctx.addIssue({
         code: "custom",

@@ -26,7 +26,9 @@ npm start
 3. **Finansman, konaklama ve belgeler:** bütçe, ödeme yöntemleri, varlıklar, konaklamalar, ilgili açıklamalar ve beyanlar.
 4. **Açıklamalar ve inceleme:** önceki adımların düzenlenebilir özeti, özel inceleme notu, kurgusal alıntılar ve inceleme yöntemi.
 
-Tek React Hook Form durumu kullanılır. Devam yalnızca geçerli adımı, son gönderim tüm etkin formu doğrular. Hatalar ilgili adımda gösterilir ve ilk hatalı alana odaklanılır. Geri dönüşler değerleri korur. Evet/Hayır/Belirtilmedi ayrı değerlerdir; gizlenen cevaplar form belleğinde korunur, doğrulamadan **önce** etkin veriden çıkarılır. Ret açıklaması, akrabalık ilişkisi ve ek akraba açıklaması yerel profil alanlarıdır. Sektör bir çalışma durumu değildir; işsizlik çıkarımı veya sektöre bağlı otomatik alan gizleme yapılmaz.
+Tek React Hook Form durumu kullanılır. Devam yalnızca geçerli adımı, son gönderim tüm etkin formu doğrular. Hatalar ilgili adımda gösterilir ve ilk hatalı alana odaklanılır. Geri dönüşler değerleri korur. Evet/Hayır sorularında açık bir cevap zorunludur; gizlenen cevaplar form belleğinde korunur, doğrulamadan **önce** etkin veriden çıkarılır. Ret açıklaması, akrabalık ilişkisi ve ek akraba açıklaması yerel profil alanlarıdır. Sektör bir çalışma durumu değildir; işsizlik çıkarımı veya sektöre bağlı otomatik alan gizleme yapılmaz.
+
+Başvuru referansı, kişisel bilgiler, tüm açıklamalar (kurgusal belge alıntıları dahil), inceleme notu ve beyan kutuları zorunludur. Yalnızca boşluk içeren metinler kabul edilmez. Çoklu seçimlerde en az bir seçenek gerekir. Evet cevabıyla açılan ayrıntılar gösterildiklerinde zorunludur; Hayır cevabında gizlenir ve doğrulamadan çıkarılır. Seyahat edilen ülke sayısı 0 ise bölgeler sorulmaz; aynı gün dönülen seyahatte konaklama kaydı gerekmez. Gecelemeli seyahatte en az bir konaklama kaydı zorunludur. AI kullanımı ve harici gönderim onayı ayrı, isteğe bağlı seçimlerdir.
 
 Başarılı gönderim raporu ana görünümde açar. Başvuruyu düzenle formu koruyarak geri getirir. Düzenleme eski raporu güncel olmaktan çıkarır; kopyalama ve yazdırma kilitlenir. AI hatalarında yerel rapor ve form korunur; onaylı istek için yeniden deneme düğmesi vardır. AI isteği açık alan listesiyle kurulur; profil, özel not ve referans gönderilmez.
 
@@ -34,7 +36,7 @@ Başarılı gönderim raporu ana görünümde açar. Başvuruyu düzenle formu k
 
 - Next.js App Router, strict TypeScript, Tailwind CSS, özelleştirilmiş shadcn/ui bileşenleri, Lucide, React Hook Form ve Zod kullanır.
 - Beş kurgusal örnek, bugünden 30 gün sonrası için üretilir: tutarlı, eksik bilgi, konaklama süresi uyuşmazlığı, ters tarihler ve seçilen amaçla çelişen seyahat açıklaması. Örnek yüklemek önceki raporu ve hataları temizler; raporu otomatik oluşturmaz. Ters tarihler ilk adımda düzeltilmelidir; serbest metin çelişkileri isteğe bağlı AI incelemesine bırakılır.
-- İlk örnek: 10 gece / 6 gece kapsam, bütçe farkı ve bir eksik beyan; toplam 3 bulgu. Tutarlı örnek: 0 bulgu. Eksik bilgi örneği: 4 bulgu.
+- İlk örnek: 10 gece / 6 gece kapsam ve bütçe farkı; toplam 2 bulgu. Tutarlı örnek: 0 bulgu. Eksik bilgi örneği, zorunlu alanlar tamamlanana kadar ilerlemeyi engeller.
 - Yerel kural bulguları deterministiktir; isteğe bağlı AI gözlemleri ayrı bir bölümde gösterilir ve yerel bulguları değiştirmez. Form bilgileri React belleğinde tutulur. Yenilemek veya **Temizle** işlemi yerel bilgileri siler. AI kullanılırsa aşağıdaki alanlar harici sağlayıcıya gönderilir. `localStorage`, veritabanı, kimlik doğrulama veya belge yükleme yoktur.
 - Form değişince rapor eski olarak işaretlenir. Yeniden oluşturulana kadar kopyalama/yazdırma kapalıdır. Tarayıcının doğrudan yazdırma işleminde de eski raporun içeriği gizlenir.
 - Kopyalama, tarayıcının pano iznine ve güvenli bağlama (localhost veya HTTPS) bağlıdır. Başarı/başarısızlık arayüzde bildirilir.
@@ -46,7 +48,7 @@ Başarılı gönderim raporu ana görünümde açar. Başvuruyu düzenle formu k
 
 ### Ek başvuru bilgileri
 
-Form; çalışma sektörü, meslek, medeni durum, işe başlama yılı, yaş, doğum ülkesi, eğitim, ziyaret edilen ülke sayısı ve bölgeler (Schengen Alanı / ABD / Diğer ülkeler), geçerli yabancı vize/oturum ülkeleri, vize reddi ülkeleri, yabancı diller, gidilecek ülkedeki akrabalar, varlık türleri (ev/araba/tarla/arsa) ve ödeme yöntemlerini (kredi/kredi kartı/nakit) toplar. Bu alanlar isteğe bağlıdır. Evet seçilen vize/oturum, ret, dil ve varlık sorularının ayrıntıları istenir; cevap değiştiğinde gizlenen ayrıntılar rapora dahil edilmez. Aynı ülke seyahat sayısında bir kez sayılır. Yaş ve ülke sayısı negatif olmayan tam sayılardır; işe başlama yılı gelecekte olamaz.
+Form; çalışma sektörü, meslek, medeni durum, işe başlama yılı, yaş, doğum ülkesi, eğitim, ziyaret edilen ülke sayısı ve bölgeler (Schengen Alanı / ABD / Diğer ülkeler), geçerli yabancı vize/oturum ülkeleri, vize reddi ülkeleri, yabancı diller, gidilecek ülkedeki akrabalar, varlık türleri (ev/araba/tarla/arsa) ve ödeme yöntemlerini (kredi/kredi kartı/nakit) toplar. Bu alanlar zorunludur. Evet seçilen vize/oturum, ret, dil, akrabalık ve varlık sorularının tüm ayrıntıları istenir; cevap değiştiğinde gizlenen ayrıntılar rapora dahil edilmez. Aynı ülke seyahat sayısında bir kez sayılır. Yaş ve ülke sayısı negatif olmayan tam sayılardır; işe başlama yılı gelecekte olamaz.
 
 Ek bilgiler yalnızca sayfa belleğinde tutulur; insan incelemesi için ekranda, kopyalanan ve yazdırılan raporda gösterilir. Otomatik kural bulgularını değiştirmez ve OpenAI’a gönderilmez. Temizleme ve örnek yükleme bu alanları da sıfırlar/değiştirir.
 
@@ -67,7 +69,7 @@ Değişiklikten sonra terminalde çalışan sunucuyu **Ctrl+C** ile durdurun ve 
 
 ### Gönderilen bilgiler ve doğrulama
 
-- Yalnızca izin verilen yapılandırılmış alanlar gönderilir: ülke, amaç, tarihler, para birimi, bütçe, maliyet tahmini, konaklamalar, beyan işaretleri; ayrıca seyahat amacı, finansman ve konaklama açıklamaları ile isteğe bağlı **kurgusal belge alıntıları**. Başvuru referansı ve özel inceleme notu gönderilmez.
+- Yalnızca izin verilen yapılandırılmış alanlar gönderilir: ülke, amaç, tarihler, para birimi, bütçe, maliyet tahmini, konaklamalar, beyan işaretleri; ayrıca seyahat amacı, finansman ve konaklama açıklamaları ile **kurgusal belge alıntıları**. Başvuru referansı ve özel inceleme notu gönderilmez.
 - İstek için açık onay gerekir. Metinleri önceden anonimleştirin: kişi/kurum adları ve kimlik, pasaport, iletişim veya ilgisiz kişisel bilgiler kullanmayın. Tanımlayıcı benzeri kalıplara yönelik ek bir engel bulunur; bu **eksiksiz bir kişisel bilgi tespit sistemi değildir**, özellikle serbest yazılmış adları güvenilir biçimde ayıramaz. Gerçek belge içeriği kullanmayın.
 - Zod doğrulaması: en fazla 20 konaklama, üç açıklama için ayrı ayrı 2.000 karakter, kurgusal alıntılar için 3.000 karakter; toplam istek gövdesi en fazla 64 KiB. Fazladan üst düzey alanlar reddedilir. Boyut sınırı akış okunurken de uygulanır.
 - AI çelişkiler, eksik açıklamalar ve belirsizlikler için en fazla 8 gözlem üretir. Her gözlem, gerçekten gönderilen bir alan kimliğine ve o alanın metniyle eşleşen alıntıya dayanmalı, netleştirme sorusu içermelidir. Boş alanın alıntısı boş olabilir. Hatalı alan/alıntı veya şema dışı yanıt reddedilir; istemci de doğrulamayı tekrarlar.
@@ -90,7 +92,7 @@ npm run build
 npm run test:browser
 ```
 
-Bu akış güncellemesinde lint, TypeScript kontrolü, 28 birim testi ve üretim derlemesi geçti. Google Chrome ile 320, 375, 390, 768, 1024 ve 1440 px genişliklerde 48 tarayıcı senaryosu geçti. Adım doğrulaması, değerlerin korunması, koşullu alanlar, AI alan sınırı, örnek yükleme, rapor güncelliği, klavye odağı, kopyalama ve yazdırma görünümü doğrulandı. Masaüstü ve mobil ekran görüntüleri de gözden geçirildi; fiziksel mobil cihaz ve canlı OpenAI çağrısı bu kontrole dahil değildir.
+Önceki akış güncellemesinde lint, TypeScript kontrolü, 28 birim testi ve üretim derlemesi geçti. Google Chrome ile 320, 375, 390, 768, 1024 ve 1440 px genişliklerde 48 tarayıcı senaryosu geçti. Adım doğrulaması, değerlerin korunması, koşullu alanlar, AI alan sınırı, örnek yükleme, rapor güncelliği, klavye odağı, kopyalama ve yazdırma görünümü doğrulandı. Masaüstü ve mobil ekran görüntüleri de gözden geçirildi; fiziksel mobil cihaz ve canlı OpenAI çağrısı bu kontrole dahil değildir.
 
 İnceleme motoru, AI entegrasyonu, profil ve adım doğrulaması için odaklı testler vardır. AI testleri resmî SDK’yı **taklit taşıma katmanıyla** çalıştırır: gerçek API çağrısı veya ücret yoktur. Alan izin listesi, onay, uzunluk sınırları, kanıt eşleşmesi, eksik yapılandırma, zaman aşımı/iptal, sağlayıcı hatası, geçersiz yanıt ve yerel motorun değişmemesi kontrol edilir. Ek saat dilimi kontrolü: `TZ=Europe/Berlin npm test`.
 

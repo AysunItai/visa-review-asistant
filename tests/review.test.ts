@@ -90,20 +90,19 @@ test("budget compares exclusively against entered estimate", () => {
   application.budget = "1000.30";
   assert.equal(reviewApplication(application).findings.length, 0);
 });
-test("missing declarations have distinct stable IDs", () => {
+test("missing declarations prevent report generation with field errors", () => {
   const application = full();
   application.declarations.identity = false;
   application.declarations.budget = false;
-  assert.deepEqual(
-    reviewApplication(application).findings.map((f) => f.ruleId),
-    ["declaration.identity", "declaration.budget"]
-  );
+  const result = applicationSchema.safeParse(application);
+  assert.equal(result.success, false);
+  if (!result.success) assert.deepEqual(result.error.issues.map((issue) => issue.path.join(".")), ["declarations.identity", "declarations.budget"]);
+  assert.throws(() => reviewApplication(application));
 });
-test("missing accommodation is a missing-information finding, not duplicate coverage", () => {
-  const result = reviewApplication(getSample("missing", "2026-02-01"));
-  assert.equal(result.findings.length, 4);
-  assert.equal(result.findings[0].ruleId, "accommodation.missing");
-  assert.equal(result.findings[0].category, "Eksik bilgi");
+test("missing information sample must be completed before a report can be generated", () => {
+  const application = getSample("missing", "2026-02-01");
+  assert.equal(applicationSchema.safeParse(application).success, false);
+  assert.throws(() => reviewApplication(application));
 });
 test("date-only arithmetic across spring and fall DST boundaries", () => {
   for (const [start, end] of [
@@ -176,8 +175,8 @@ test("engine is deterministic, does not mutate input, and ignores free-text note
     !reportText(reviewApplication(application)).includes(application.notes)
   );
 });
-test("all fictional samples stay valid relative to today's date", () => {
-  for (const key of ["clarification", "consistent", "missing"] as const) {
+test("complete fictional samples stay valid relative to today's date", () => {
+  for (const key of ["clarification", "consistent", "purposeConflict"] as const) {
     const application = getSample(key);
     assert.equal(applicationSchema.safeParse(application).success, true);
     assert.equal(reviewApplication(application).nights, 10);

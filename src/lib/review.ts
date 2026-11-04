@@ -48,6 +48,13 @@ function unionLength(intervals: Interval[]): number {
 /** Pure authoritative engine. Invalid input throws before any report is generated. */
 export function reviewApplication(input: Application): Review {
   const application = applicationSchema.parse(input);
+  return { application, ...reviewValidatedContext(application) };
+}
+
+/** Shared calculations for already validated form or allowlisted API context. */
+export function reviewValidatedContext(application: Pick<Application,
+  "departure" | "returnDate" | "stays" | "budget" | "estimatedCost" | "currency" | "declarations"
+>): Omit<Review, "application"> {
   const start = dayNumber(application.departure);
   const end = dayNumber(application.returnDate);
   const nights = end - start;
@@ -172,7 +179,6 @@ export function reviewApplication(input: Application): Review {
       )} konu belirlendi. Aşağıdaki bulgular, insan incelemesinde netleştirilebilecek bilgileri ve dayanaklarını gösterir.`
     : "Bu sınırlı kontroller kapsamında girilen bilgilerde eksiklik veya tutarsızlık tespit edilmedi. Bu sonuç, vize uygunluğu veya başvurunun sonucu hakkında bir değerlendirme değildir.";
   return {
-    application,
     nights,
     coveredNights,
     uncoveredNights,

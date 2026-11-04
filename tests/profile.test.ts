@@ -6,8 +6,9 @@ import { getSample } from "../src/lib/samples.ts";
 import { reviewApplication, reportText } from "../src/lib/review.ts";
 import { aiRequestSchema, toAIRequest } from "../src/lib/ai-contract.ts";
 
-test("profile is optional to fill, but supplied numbers and selections must be valid", () => {
-  const profile = emptyProfile();
+test("profile requires answers and validates supplied numbers and selections", () => {
+  assert.equal(profileSchema.safeParse(emptyProfile()).success, false);
+  const profile = getSample("consistent").profile;
   assert.ok(profileSchema.safeParse(profile).success);
   for (const [key, values] of [
     ["age", ["-1", "1.5", "121", "abc"]],
@@ -20,7 +21,7 @@ test("profile is optional to fill, but supplied numbers and selections must be v
       assert.equal(profileSchema.safeParse({ ...profile, [key]: value }).success, false, `${key}: ${value}`);
   }
   assert.ok(profileSchema.safeParse({ ...profile, age: "0", visitedCountryCount: "0", employmentStartYear: String(new Date().getFullYear()) }).success);
-  assert.equal(profileSchema.safeParse({ ...profile, visitedCountryCount: "0", travelRegions: ["ABD"] }).success, false);
+  assert.deepEqual(profileSchema.parse({ ...profile, visitedCountryCount: "0", travelRegions: ["ABD"] }).travelRegions, []);
 });
 
 test("yes answers require details and hidden answers cannot enter the report", () => {
@@ -31,7 +32,7 @@ test("yes answers require details and hidden answers cannot enter the report", (
   application.profile.hasValidVisaOrResidence = "Hayır";
   application.profile.hasVisaRefusal = "Hayır";
   application.profile.visaRefusalCountries = "Japonya";
-  application.profile.hasForeignLanguages = "";
+  application.profile.hasForeignLanguages = "Hayır";
   application.profile.hasAssets = "Hayır";
   const parsed = applicationSchema.parse(application);
   assert.equal(parsed.profile.visaOrResidenceCountries, "");
@@ -43,7 +44,7 @@ test("yes answers require details and hidden answers cannot enter the report", (
 
 test("profile survives review and copy without affecting findings or AI requests", () => {
   const sample = getSample("consistent");
-  const baseline = { ...sample, profile: emptyProfile() };
+  const baseline = { ...sample, profile: { ...sample.profile, occupation: "Mimar", hasAssets: "Hayır" as const } };
   const report = reviewApplication(sample);
   assert.deepEqual(report.application.profile, sample.profile);
   assert.deepEqual(report.findings, reviewApplication(baseline).findings);

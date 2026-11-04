@@ -10,8 +10,7 @@ import {
   type AIResponse,
 } from "../lib/ai-contract.ts";
 import { hasIdentifierLikeText } from "../lib/narratives.ts";
-import { emptyApplication } from "../lib/validation.ts";
-import { reviewApplication } from "../lib/review.ts";
+import { reviewValidatedContext } from "../lib/review.ts";
 
 export const MAX_BODY_BYTES = 64 * 1024;
 export const PROVIDER_TIMEOUT_MS = 25_000;
@@ -124,10 +123,7 @@ export async function analyzeRequest(
       logger: { debug() {}, info() {}, warn() {}, error() {} },
       ...(config.fetch ? { fetch: config.fetch } : {}),
     });
-    const local = reviewApplication({
-      ...emptyApplication(),
-      ...input.data.context,
-    });
+    const local = reviewValidatedContext(input.data.context);
     const response = await client.responses.parse(
       {
         model: config.model.trim(),

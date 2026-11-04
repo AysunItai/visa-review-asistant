@@ -32,7 +32,7 @@ test("AI consent, explicit payload boundary, failure retry and report freshness"
   await enableAI(page);
   await generate(page);
   await expect(page.getByRole("heading", { name: "Kurgusal AI test gözlemi" })).toBeVisible();
-  await expect(page.locator(".finding-card")).toHaveCount(3);
+  await expect(page.locator(".finding-card")).toHaveCount(2);
   expect(calls).toBe(1);
   await editStep(page, 3);
   await page.getByLabel("Finansman açıklaması", { exact: true }).fill("Güncellenen kurgusal açıklama.");

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { applicationSchema, type Application } from "./validation.ts";
+import { applicationSchema, requireAccommodation, type Application } from "./validation.ts";
 import { personalProfileSchema, financialProfileSchema } from "./applicant-profile.ts";
 import { narrativeSchema } from "./narratives.ts";
 import { dayNumber } from "./dates.ts";
@@ -22,10 +22,11 @@ const stepSchemas = [
   }),
   z.object({ profile: personalProfileSchema }),
   z.object({
+    departure: shape.departure, returnDate: shape.returnDate,
     currency: shape.currency, budget: shape.budget, estimatedCost: shape.estimatedCost,
     profile: financialProfileSchema, stays: shape.stays, declarations: shape.declarations,
     narratives: narrativeSchema.pick({ funding: true, accommodation: true }).strip(),
-  }),
+  }).superRefine(requireAccommodation),
   z.object({ notes: shape.notes, narratives: narrativeSchema.pick({ fictionalExcerpts: true }).strip() }),
 ] as const;
 

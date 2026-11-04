@@ -111,7 +111,7 @@ test("keyboard navigation, validation focus, report focus and reduced motion", a
   await page.getByRole("button", { name: "Başvuru incelemeye başla" }).click();
   await page.getByRole("button", { name: "Devam", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByLabel("Gidiş tarihi")).toBeFocused();
+  await expect(page.getByLabel("Başvuru referansı")).toBeFocused();
   await expect(page.getByLabel("Gidiş tarihi")).toHaveAttribute("aria-describedby", "departure-error");
   await loadSample(page);
   await finalStep(page);

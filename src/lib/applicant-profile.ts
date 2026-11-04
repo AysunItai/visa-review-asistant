@@ -6,24 +6,27 @@ export const educationLevels = ["İlkokul", "Ortaokul", "Lise", "Ön lisans", "L
 export const travelRegions = ["Schengen Alanı", "ABD", "Diğer ülkeler"] as const;
 export const assetTypes = ["Ev", "Araba", "Tarla", "Arsa"] as const;
 export const fundingMethods = ["Kredi", "Kredi kartı", "Nakit"] as const;
-const answer = z.enum(["", "Evet", "Hayır"]);
+const answer = z.enum(["", "Evet", "Hayır"]).refine((value): boolean => value !== "", "Evet veya Hayır seçin.");
 const shortText = z.string().trim().max(200, "En fazla 200 karakter girin.");
+const requiredText = shortText.min(1, "Bu alanı doldurun.");
+const requiredSelection = <T extends string>(options: readonly T[]) =>
+  z.enum(["", ...options]).refine((value): boolean => value !== "", "Bir seçenek seçin.");
 const countryList = z.string().trim().max(500, "En fazla 500 karakter girin.");
 const wholeNumber = (max: number, message: string) => z.string().refine(
-  (value) => value === "" || (/^\d+$/.test(value) && Number(value) <= max), message
+  (value) => /^\d+$/.test(value) && Number(value) <= max, message
 );
 
 const profileObject = z.object({
-  employmentSector: z.enum(["", ...employmentSectors]),
-  occupation: shortText,
-  maritalStatus: z.enum(["", ...maritalStatuses]),
+  employmentSector: requiredSelection(employmentSectors),
+  occupation: requiredText,
+  maritalStatus: requiredSelection(maritalStatuses),
   employmentStartYear: z.string().refine(
-    (value) => value === "" || (/^\d{4}$/.test(value) && Number(value) >= 1900 && Number(value) <= new Date().getFullYear()),
+    (value) => /^\d{4}$/.test(value) && Number(value) >= 1900 && Number(value) <= new Date().getFullYear(),
     "1900 ile içinde bulunduğumuz yıl arasında bir yıl girin."
   ),
   age: wholeNumber(120, "0 ile 120 arasında bir tam yaş girin."),
-  birthCountry: shortText,
-  education: z.enum(["", ...educationLevels]),
+  birthCountry: requiredText,
+  education: requiredSelection(educationLevels),
   visitedCountryCount: wholeNumber(250, "0 ile 250 arasında bir tam ülke sayısı girin."),
   travelRegions: z.array(z.enum(travelRegions)).max(travelRegions.length),
   hasValidVisaOrResidence: answer,
@@ -38,7 +41,7 @@ const profileObject = z.object({
   relativesDetails: z.string().trim().max(1000, "En fazla 1.000 karakter girin."),
   hasAssets: answer,
   assets: z.array(z.enum(assetTypes)).max(assetTypes.length),
-  fundingMethods: z.array(z.enum(fundingMethods)).max(fundingMethods.length),
+  fundingMethods: z.array(z.enum(fundingMethods)).min(1, "En az bir ödeme yöntemi seçin.").max(fundingMethods.length),
 });
 
 // Normalize a copy before validation. Raw answers remain in React Hook Form so
@@ -46,6 +49,7 @@ const profileObject = z.object({
 export function activeProfile(profile: ApplicantProfile): ApplicantProfile {
   return {
     ...profile,
+    travelRegions: profile.visitedCountryCount !== "" && Number(profile.visitedCountryCount) === 0 ? [] : profile.travelRegions,
     visaOrResidenceCountries: profile.hasValidVisaOrResidence === "Evet" ? profile.visaOrResidenceCountries : "",
     visaRefusalCountries: profile.hasVisaRefusal === "Evet" ? profile.visaRefusalCountries : "",
     refusalExplanation: profile.hasVisaRefusal === "Evet" ? profile.refusalExplanation : "",
@@ -64,14 +68,16 @@ const personalObject = profileObject.omit(financialKeys).superRefine((profile, c
   for (const [status, detail, message] of [
     ["hasValidVisaOrResidence", "visaOrResidenceCountries", "Geçerli vize veya oturumunuzun bulunduğu ülkeleri belirtin."],
     ["hasVisaRefusal", "visaRefusalCountries", "Vize reddi aldığınız ülkeleri belirtin."],
+    ["hasVisaRefusal", "refusalExplanation", "Vize reddi açıklamasını girin."],
     ["hasForeignLanguages", "foreignLanguages", "Bildiğiniz yabancı dilleri belirtin."],
     ["hasRelativesAtDestination", "relativeRelationship", "Akrabalık ilişkinizi belirtin."],
+    ["hasRelativesAtDestination", "relativesDetails", "Akrabanızla ilgili ek açıklamayı girin."],
   ] as const) {
     if (profile[status] === "Evet" && !profile[detail])
       ctx.addIssue({ code: "custom", path: [detail], message });
   }
-  if (profile.visitedCountryCount !== "" && Number(profile.visitedCountryCount) === 0 && profile.travelRegions.length)
-    ctx.addIssue({ code: "custom", path: ["travelRegions"], message: "Ülke sayısı 0 ise seyahat bölgesi seçmeyin." });
+  if (Number(profile.visitedCountryCount) > 0 && !profile.travelRegions.length)
+    ctx.addIssue({ code: "custom", path: ["travelRegions"], message: "En az bir seyahat bölgesi seçin." });
 });
 const financialObject = profileObject.pick(financialKeys).superRefine((profile, ctx) => {
   if (profile.hasAssets === "Evet" && !profile.assets.length)

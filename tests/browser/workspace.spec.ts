@@ -7,7 +7,7 @@ test("samples, report view, copy, print, freshness and clear", async ({ page, co
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("lang", "tr");
   await expect(page.locator("#review-report")).toHaveCount(0);
-  for (const [sample, count] of [["clarification", 3], ["consistent", 0], ["missing", 4]] as const) {
+  for (const [sample, count] of [["consistent", 0], ["clarification", 2]] as const) {
     await loadSample(page, sample);
     await expect(page.locator("#review-report")).toHaveCount(0);
     await finalStep(page);
@@ -50,8 +50,8 @@ test("step validation focuses errors and preserves values during back/edit navig
   await page.goto("/");
   await next(page);
   await expect(page.getByText("Geçerli bir tarih girin.")).toHaveCount(2);
-  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(2);
-  await expect(page.getByLabel("Gidiş tarihi")).toBeFocused();
+  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(4);
+  await expect(page.getByLabel("Başvuru referansı")).toBeFocused();
   await expect(page.getByText("Bir tutar girin.")).toHaveCount(0);
   await loadSample(page, "dateConflict");
   await next(page);
@@ -79,6 +79,12 @@ test("step validation focuses errors and preserves values during back/edit navig
   await page.getByRole("button", { name: "Konaklama ekle" }).click();
   await expect(page.getByLabel("Giriş tarihi", { exact: true })).toHaveValue("");
   await page.getByRole("button", { name: "1. konaklamayı kaldır" }).click();
+  await next(page);
+  await expect(page.getByText("En az bir konaklama ekleyin.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Konaklama ekle" })).toBeFocused();
+  await page.getByRole("button", { name: "Konaklama ekle" }).click();
+  await page.getByLabel("Giriş tarihi", { exact: true }).fill(checkIn);
+  await page.getByLabel("Çıkış tarihi", { exact: true }).fill(await page.getByLabel("Dönüş tarihi").inputValue());
   await next(page);
   await generate(page);
   await page.reload();
