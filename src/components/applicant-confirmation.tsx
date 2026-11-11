@@ -20,6 +20,5 @@ export function ApplicantConfirmation({ receipts, onNew }: { receipts: Applicant
       </article>)}
     </div>
     <Button className="mt-7" variant="outline" onClick={onNew}>Yeni kurgusal başvuru <ArrowRight /></Button>
-    <p className="mt-6 text-sm leading-6 text-muted-foreground">Veriler yalnızca bu oturumda tutulur. Yenileme tüm demo verilerini siler.</p>
   </section>;
 }

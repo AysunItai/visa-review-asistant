@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
-import { ArrowRight, ArrowLeftRight, Focus, UserRound, LayoutDashboard, ShieldCheck, FileCheck2, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowLeftRight, Focus } from "lucide-react";
 import { ApplicationForm } from "./application-form";
 import { ApplicantConfirmation } from "./applicant-confirmation";
 import { AdminList } from "./admin-list";
@@ -60,22 +60,25 @@ export function Workspace() {
     } finally { if (pending.current.get(id) === controller) pending.current.delete(id); }
   }
   return <div className="demo-shell">
-    <header className="demo-header no-print">
-      <button className="demo-brand" onClick={() => dispatch({ type: "role", role: null })} aria-label="VizeLens · Rol seçimine dön"><Focus size={28} /><span>Vize<span className="font-normal">Lens</span></span></button>
-      <span className="demo-environment">Demo ortamı</span>
-      <div className="demo-header-actions">{state.role && <><span className="role-label">{state.role === "admin" ? "Yönetici" : "Başvuru sahibi"}</span><Button variant="outline" onClick={() => { setSelectedId(null); dispatch({ type: "role", role: state.role === "admin" ? "applicant" : "admin" }); }}><ArrowLeftRight /><span>{state.role === "admin" ? "Başvuru sahibine geç" : "Yöneticiye geç"}</span></Button></>}</div>
+    <header className={`demo-header no-print ${state.role === "admin" ? "admin-header" : ""}`}>
+      <button className="demo-brand" onClick={() => dispatch({ type: "role", role: null })} aria-label="VizeLens · Ana sayfaya dön"><Focus size={28} /><span>Vize<span className="font-normal">Lens</span></span></button>
+      <div className="demo-header-actions">
+        {state.role === "admin" ? <>
+          <span className="role-label">Yönetici</span>
+          <Button variant="outline" onClick={() => { setSelectedId(null); dispatch({ type: "role", role: "applicant" }); }}><ArrowLeftRight />Başvuru sahibine geç</Button>
+        </> : <a className="admin-entry-link" href="#main" onClick={(event) => {
+          event.preventDefault();
+          setSelectedId(null);
+          dispatch({ type: "role", role: "admin" });
+        }}>Yönetici girişi</a>}
+      </div>
     </header>
     <main id="main" ref={main} tabIndex={-1} className={`demo-main ${state.role === "admin" ? "admin-width" : "applicant-width"}`}>
-      {state.role === null && <section className="role-entry" aria-labelledby="role-heading">
-        <p className="eyebrow">BİLGİDEN DEĞERLENDİRMEYE</p>
-        <h1 id="role-heading">Her başvuruya<br /><span>daha net bir bakış.</span></h1>
-        <p className="role-intro">Başvurunuzu hazırlayın ya da yönetici olarak yanıtları ve ön inceleme gerekçelerini değerlendirin.</p>
-        <div className="role-cards">
-          <button className="role-card" onClick={() => dispatch({ type: "role", role: "applicant" })}><span className="role-icon"><UserRound /></span><span className="role-kicker">BAŞVURU SAHİBİ</span><strong>Bir sonraki yolculuğa<br />ilk adım.</strong><span className="role-description">Bilgilerinizi dört adımda tamamlayın, kontrol edin ve incelemeye gönderin.</span><span className="role-action">Başvuru sahibi olarak devam et <ArrowRight /></span></button>
-          <button className="role-card admin-role-card" onClick={() => dispatch({ type: "role", role: "admin" })}><span className="role-icon"><LayoutDashboard /></span><span className="role-kicker">YÖNETİCİ</span><strong>Yanıtları görün.<br />Kararı siz verin.</strong><span className="role-description">Başvuruları karşılaştırın, AI değerlendirmesini inceleyin ve demo kararını kaydedin.</span><span className="role-action">Yönetici olarak devam et <ArrowRight /></span></button>
-        </div>
-        <div className="role-footnotes"><span><FileCheck2 />Kurgusal başvurular</span><span><Sparkles />Yönetici isteğiyle analiz</span><span><ShieldCheck />İnsan kararı</span></div>
-        <p className="session-note">Bunlar demo rol seçimleridir; gerçek kimlik doğrulama değildir.<br />Veriler yalnızca bu oturumda tutulur ve sayfa yenilendiğinde silinir.</p>
+      {state.role === null && <section className="applicant-hero" aria-labelledby="landing-heading">
+        <p className="eyebrow">VİZE BAŞVURUSU</p>
+        <h1 id="landing-heading">Seyahatinizin ilk adımı.</h1>
+        <p className="hero-description">Vize başvurunuz için bilgilerinizi birkaç adımda tamamlayın ve başvurunuzu iletin.</p>
+        <Button className="hero-primary-action" onClick={() => dispatch({ type: "role", role: "applicant" })}>Başvuruya başla <ArrowRight aria-hidden="true" /></Button>
       </section>}
       <div hidden={state.role !== "applicant"}>
         {(submitted || showReceipts) ? <ApplicantConfirmation receipts={receipts} onNew={() => { setShowReceipts(false); if (submitted) setDraftNumber((n) => n + 1); }} /> : <>
@@ -93,6 +96,6 @@ export function Workspace() {
       {state.role === "admin" && (selected ? <AdminDetail key={selected.id} entry={selected} onBack={() => setSelectedId(null)} onAnalyze={() => void analyze(selected.id)} onNote={(note) => dispatch({ type: "note", id: selected.id, note })} onDecision={(input) => dispatch({ type: "decision", id: selected.id, input, at: new Date().toISOString() })} /> :
         <AdminList cases={state.cases} onSeed={seed} onOpen={(id) => { dispatch({ type: "open", id }); setSelectedId(id); }} />)}
     </main>
-    <footer className="demo-footer no-print"><span>VizeLens · Sınıf prototipi</span><span>Yalnızca oturum belleği · Yenilemede silinir</span></footer>
+    <footer className="demo-footer no-print"><p>Prototip sürüm. Bilgiler yalnızca bu oturumda tutulur; sayfa yenilendiğinde silinir.</p></footer>
   </div>;
 }

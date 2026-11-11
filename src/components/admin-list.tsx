@@ -25,7 +25,7 @@ export function AdminList({ cases, onOpen, onSeed }: { cases: DemoCase[]; onOpen
       ].map(([label, count, hint]) => <div className="summary-card" key={label}><p>{label}</p><strong>{count}</strong><span>{hint}</span></div>)}
     </div>
     <section className="case-list-panel" aria-labelledby="case-list-title">
-      <div className="case-list-heading"><h2 id="case-list-title"><FileText className="size-5" />Başvuru listesi <span className="count-pill">{matches.length}</span></h2><span className="text-xs text-muted-foreground">Yalnızca bu oturum</span></div>
+      <div className="case-list-heading"><h2 id="case-list-title"><FileText className="size-5" />Başvuru listesi <span className="count-pill">{matches.length}</span></h2></div>
       <div className="case-filters">
         <div className="search-control"><label className="sr-only" htmlFor="case-search">Başvuru referansı ara</label><Search aria-hidden="true" /><input id="case-search" type="search" placeholder="Başvuru referansı ara…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
         <div className="filter-control"><Filter aria-hidden="true" className="size-4" /><label htmlFor="case-filter" className="sr-only">Duruma göre filtrele</label><select id="case-filter" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}><option value="all">Tüm durumlar</option>{Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div>
@@ -43,6 +43,6 @@ export function AdminList({ cases, onOpen, onSeed }: { cases: DemoCase[]; onOpen
           </tr>)}</tbody>
         </table>}
     </section>
-    <p className="mt-5 text-xs leading-6 text-muted-foreground">Demo rolleri erişim güvenliği sağlamaz. Aynı oturumdaki kurgusal başvurular bu listede paylaşılır.</p>
+    <p className="mt-5 text-xs leading-6 text-muted-foreground">Yönetici görünümü kimlik doğrulaması içermez.</p>
   </>;
 }

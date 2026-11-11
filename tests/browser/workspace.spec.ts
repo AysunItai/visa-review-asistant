@@ -18,7 +18,7 @@ test("applicant submits, admin analyzes and confirms a separate decision, applic
   await expect(page.locator('[name="analysis-mode"], [name="notes"], [name="narratives.fictionalExcerpts"]')).toHaveCount(0);
   await expect(page.locator("#review-report, #human-review")).toHaveCount(0);
   await submit(page); expect(requests).toBe(0);
-  await page.getByRole("button", { name: "Yöneticiye geç" }).click();
+  await page.getByRole("link", { name: "Yönetici girişi", exact: true }).click();
   await expect(page.locator(".case-table tbody tr")).toHaveCount(1);
   await page.getByRole("button", { name: "ÖRNEK-002 başvurusunu incele" }).click();
   await page.getByLabel("İç inceleme notu", { exact: true }).fill("YÖNETİCİYE ÖZEL not");
@@ -58,7 +58,7 @@ test("applicant submits, admin analyzes and confirms a separate decision, applic
 test("role switching preserves draft and submissions; repeated clicks do not duplicate cases", async ({ page }) => {
   await page.goto("/"); await loadSample(page); await next(page);
   await page.getByLabel("Mesleğiniz", { exact: true }).fill("Kurgusal mimar");
-  await page.getByRole("button", { name: "Yöneticiye geç" }).click();
+  await page.getByRole("link", { name: "Yönetici girişi", exact: true }).click();
   await expect(page.getByText("İlk başvuru için hazır", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Başvuru sahibine geç" }).click();
   await expect(page.getByLabel("Mesleğiniz", { exact: true })).toHaveValue("Kurgusal mimar");
@@ -73,7 +73,7 @@ test("role switching preserves draft and submissions; repeated clicks do not dup
   await page.getByRole("button", { name: "Başvuru sahibine geç" }).click();
   await page.getByRole("button", { name: "Yeni kurgusal başvuru" }).click();
   await loadSample(page); await finalStep(page); await submit(page);
-  await page.getByRole("button", { name: "Yöneticiye geç" }).click();
+  await page.getByRole("link", { name: "Yönetici girişi", exact: true }).click();
   await expect(page.locator(".case-table tbody tr")).toHaveCount(2);
 });
 

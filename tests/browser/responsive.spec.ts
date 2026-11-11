@@ -5,9 +5,14 @@ async function noOverflow(page: import("@playwright/test").Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 }
 
-test("role entry, applicant steps, admin cards and complete detail reflow without overflow", async ({ page }, testInfo) => {
+test("applicant landing, form, admin cards and complete detail reflow without overflow", async ({ page }, testInfo) => {
   await page.goto("/"); await noOverflow(page);
-  await page.screenshot({ path: testInfo.outputPath("role-entry.png"), fullPage: true });
+  await expect(page.getByRole("heading", { name: "Seyahatinizin ilk adımı.", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Başvuruya başla", exact: true })).toBeVisible();
+  await expect(page.getByRole("banner").getByRole("link", { name: "Yönetici girişi", exact: true })).toBeVisible();
+  await expect(page.locator(".role-card, .role-footnotes")).toHaveCount(0);
+  await expect(page.getByText("Prototip sürüm. Bilgiler yalnızca bu oturumda tutulur; sayfa yenilendiğinde silinir.", { exact: true })).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath("applicant-landing.png"), fullPage: true });
   await loadSample(page); await noOverflow(page);
   await next(page); await noOverflow(page); await next(page); await noOverflow(page);
   await page.getByRole("button", { name: "Konaklama ekle", exact: true }).click();

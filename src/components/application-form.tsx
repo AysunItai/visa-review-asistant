@@ -593,8 +593,7 @@ export function ApplicationForm({ onSubmitApplication, active }: {
             role="status"
             className="mt-3 text-sm leading-5 text-muted-foreground"
           >
-            {feedback ||
-              "Veriler yalnızca bu oturumda tutulur. Sayfayı yenilemek tüm demo verilerini siler."}
+            {feedback}
           </p>
         </div>
       </form>

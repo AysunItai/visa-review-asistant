@@ -1,10 +1,10 @@
 import { expect, type Page } from "@playwright/test";
 
 export async function enterApplicant(page: Page) {
-  await page.getByRole("button", { name: /Başvuru sahibi olarak devam et/ }).click();
+  await page.getByRole("button", { name: "Başvuruya başla", exact: true }).click();
 }
 export async function loadSample(page: Page, sample = "consistent") {
-  const entry = page.getByRole("button", { name: /Başvuru sahibi olarak devam et/ });
+  const entry = page.getByRole("button", { name: "Başvuruya başla", exact: true });
   if (await entry.isVisible()) await entry.click();
   await page.getByLabel("Örnek başvuru seçin").selectOption(sample);
   await page.getByRole("button", { name: "Örnek Başvuru Yükle" }).click();
@@ -21,13 +21,13 @@ export async function submit(page: Page) {
   await expect(page.getByRole("heading", { name: "Başvurunuz alındı." })).toBeVisible();
 }
 export async function openSubmitted(page: Page, reference = "ÖRNEK-002") {
-  await page.getByRole("button", { name: "Yöneticiye geç" }).click();
+  await page.getByRole("link", { name: "Yönetici girişi", exact: true }).click();
   await page.getByRole("button", { name: `${reference} başvurusunu incele` }).click();
   await expect(page.locator("#case-title")).toHaveText(reference);
 }
 export async function seedAdmin(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: /Yönetici olarak devam et/ }).click();
+  await page.getByRole("link", { name: "Yönetici girişi", exact: true }).click();
   await page.getByRole("button", { name: "Kurgusal başvuruları yükle" }).click();
 }
 export async function editStep(page: Page, step: number) {

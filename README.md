@@ -21,10 +21,10 @@ npm start
 
 ## Demo akışı
 
-1. Giriş ekranında **Başvuru sahibi olarak devam et** seçin. Bunlar rol seçicilerdir; parola, gerçek kimlik doğrulama veya güvenlik sınırı yoktur.
+1. Ana sayfada **Başvuruya başla** seçin. Üst sağdaki **Yönetici girişi** bağlantısı yönetici görünümünü açar; parola, gerçek kimlik doğrulama veya güvenlik sınırı yoktur.
 2. Bir kurgusal örnek yükleyin veya uygulanabilir alanları doldurun. Dört adımda seyahat, profil/geçmiş, finansman/konaklama/beyanlar ve gönderim özeti bulunur.
 3. Gönderilen yanıtların yönetici tarafından OpenAI üzerinden analiz edilebileceğini kabul edip **Başvuruyu gönder** seçin. Başvuru AI kullanılabilirliğinden bağımsız olarak kaydedilir.
-4. **Yöneticiye geç** ile başvuru listesine dönün. Referans araması, durum filtresi ve özet sayıları kullanın. Boş liste için **Kurgusal başvuruları yükle** üç gönderilmiş örnek oluşturur; AI sonucu uydurmaz.
+4. **Yönetici girişi** ile başvuru listesine geçin. Referans araması, durum filtresi ve özet sayıları kullanın. Boş liste için **Kurgusal başvuruları yükle** üç gönderilmiş örnek oluşturur; AI sonucu uydurmaz.
 5. **İncele** ile gönderilen tüm uygulanabilir yanıtları, yerel kontrolleri ve iç inceleme panelini açın. **AI değerlendirmesi oluştur** yalnızca seçilen başvuruyu analiz eder.
 6. İç not ekleyin. **Onayla**, **Reddet** veya **Ek bilgi iste** seçin; red ve ek bilgi için kısa gerekçe gerekir. Kararı gözden geçirip ayrı düğmeyle onaylayın. AI hiçbir insan kararını seçmez veya uygulamaz.
 7. Başvuru sahibi görünümüne dönün: güncel demo durumu görünür, iç notlar ve AI bulguları görünmez. Yönetici kaydedilen kararı açık bir düzenleme eylemiyle değiştirebilir.
