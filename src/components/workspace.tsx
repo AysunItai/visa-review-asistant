@@ -1,226 +1,98 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import {
-  ArrowUpRight,
-  BookOpen,
-  FileSearch,
-  Focus,
-  LockKeyhole,
-  PanelLeftClose,
-  ShieldCheck,
-} from "lucide-react";
-import { ApplicationForm } from "@/components/application-form";
-import { ReviewReport } from "@/components/review-report";
-import { HowItWorks } from "@/components/how-it-works";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { reviewApplication, type Review } from "@/lib/review";
-import { toAIRequest, aiStatusLabel, type AIState } from "@/lib/ai-contract";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { ArrowRight, ArrowLeftRight, Focus, UserRound, LayoutDashboard, ShieldCheck, FileCheck2, Sparkles } from "lucide-react";
+import { ApplicationForm } from "./application-form";
+import { ApplicantConfirmation } from "./applicant-confirmation";
+import { AdminList } from "./admin-list";
+import { AdminDetail } from "./admin-detail";
+import { Button } from "./ui/button";
+import { createCase, demoReducer, initialDemoState, applicantReceipt, caseAIRequest } from "@/lib/demo-cases";
 import { requestAI } from "@/lib/ai-client";
-import type { Application } from "@/lib/validation";
-import type { AnalysisOptions } from "@/lib/narratives";
+import { getSample } from "@/lib/samples";
 
 export function Workspace() {
-  const [view, setView] = useState<"review" | "how">("review");
-  const [screen, setScreen] = useState<"form" | "report">("form");
-  const [generationError, setGenerationError] = useState("");
-  const [lastOptions, setLastOptions] = useState<AnalysisOptions>({ useAI: false, consented: false });
-  const busy = useRef(false);
-  const [report, setReport] = useState<Review | null>(null);
-  const [stale, setStale] = useState(false);
-  const [ai, setAI] = useState<AIState>({ status: "local" });
-  const controller = useRef<AbortController | null>(null);
-  const generation = useRef(0);
-  useEffect(() => () => controller.current?.abort(), []);
-  function cancelPending() {
-    generation.current++;
-    controller.current?.abort();
-    controller.current = null;
-    busy.current = false;
+  const [state, dispatch] = useReducer(demoReducer, initialDemoState);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftNumber, setDraftNumber] = useState(0);
+  const [showReceipts, setShowReceipts] = useState(false);
+  const draftId = `applicant-draft-${draftNumber}`;
+  const pending = useRef(new Map<string, AbortController>());
+  const submissions = useRef(new Set<string>());
+  const seeded = useRef(false);
+  const main = useRef<HTMLElement>(null);
+  const navigation = useRef(`${state.role}:${selectedId}:${draftNumber}`);
+  useEffect(() => {
+    const requests = pending.current;
+    return () => { requests.forEach((controller) => controller.abort()); requests.clear(); };
+  }, []);
+  useEffect(() => {
+    const current = `${state.role}:${selectedId}:${draftNumber}`;
+    if (navigation.current === current) return;
+    navigation.current = current;
+    main.current?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [state.role, selectedId, draftNumber]);
+  const submitted = state.cases.some((entry) => entry.draftId === draftId);
+  const receipts = state.cases.filter((entry) => entry.source === "applicant").map(applicantReceipt);
+  const selected = state.cases.find((entry) => entry.id === selectedId);
+  function seed() {
+    if (seeded.current) return;
+    seeded.current = true;
+    for (const [index, key] of (["consistent", "clarification", "purposeConflict"] as const).entries()) {
+      const application = getSample(key);
+      application.reference = `DEMO-2026-${String(index + 1).padStart(3, "0")}`;
+      dispatch({ type: "submit", entry: createCase(application, true, { id: crypto.randomUUID(), draftId: `seed-${key}`, submittedAt: new Date().toISOString(), source: "demo" }) });
+    }
   }
-  function analyze(application: Application, options: AnalysisOptions) {
-    if (busy.current) return;
-    cancelPending();
-    setGenerationError("");
+  async function analyze(id: string) {
+    const entry = state.cases.find((item) => item.id === id);
+    if (!entry || entry.ai.status === "successful" || pending.current.has(id)) return;
+    const controller = new AbortController();
+    const requestId = crypto.randomUUID();
+    pending.current.set(id, controller);
+    dispatch({ type: "ai-start", id, requestId });
     try {
-      setReport(reviewApplication(application));
+      const response = await requestAI(caseAIRequest(entry), controller.signal);
+      if (!controller.signal.aborted) dispatch({ type: "ai-finish", id, requestId, response });
     } catch {
-      setGenerationError("Rapor oluşturulamadı. Bilgileriniz korundu; inceleme düğmesiyle yeniden deneyebilirsiniz.");
-      setStale(true);
-      return;
-    }
-    setLastOptions(options);
-    setStale(false);
-    setScreen("report");
-    if (!options.useAI) {
-      setAI({ status: "local" });
-      return;
-    }
-    if (!options.consented) {
-      setAI({ status: "unavailable", reason: "consent_required" });
-      return;
-    }
-    const current = generation.current;
-    const pending = new AbortController();
-    controller.current = pending;
-    busy.current = true;
-    setAI({ status: "loading" });
-    void requestAI(toAIRequest(application), pending.signal).then((result) => {
-      if (generation.current !== current || pending.signal.aborted) return;
-      controller.current = null;
-      busy.current = false;
-      setAI(result);
-    });
+      if (!controller.signal.aborted) dispatch({ type: "ai-finish", id, requestId, response: { status: "unavailable", reason: "provider_error" } });
+    } finally { if (pending.current.get(id) === controller) pending.current.delete(id); }
   }
-  return (
-    <div className="app-shell">
-      <aside className="navigation-rail">
-        <div className="brand-area">
-          <a href="#main" onClick={() => setView("review")} className="brand">
-            <span className="brand-mark">
-              <Focus className="size-[22px]" strokeWidth={1.7} />
-            </span>
-            <span>
-              Vize<span className="font-normal">Lens</span>
-              <span className="brand-subtitle">İNCELEME ÇALIŞMA ALANI</span>
-            </span>
-          </a>
-          <Badge className="prototype-badge">Araştırma prototipi</Badge>
+  return <div className="demo-shell">
+    <header className="demo-header no-print">
+      <button className="demo-brand" onClick={() => dispatch({ type: "role", role: null })} aria-label="VizeLens · Rol seçimine dön"><Focus size={28} /><span>Vize<span className="font-normal">Lens</span></span></button>
+      <span className="demo-environment">Demo ortamı</span>
+      <div className="demo-header-actions">{state.role && <><span className="role-label">{state.role === "admin" ? "Yönetici" : "Başvuru sahibi"}</span><Button variant="outline" onClick={() => { setSelectedId(null); dispatch({ type: "role", role: state.role === "admin" ? "applicant" : "admin" }); }}><ArrowLeftRight /><span>{state.role === "admin" ? "Başvuru sahibine geç" : "Yöneticiye geç"}</span></Button></>}</div>
+    </header>
+    <main id="main" ref={main} tabIndex={-1} className={`demo-main ${state.role === "admin" ? "admin-width" : "applicant-width"}`}>
+      {state.role === null && <section className="role-entry" aria-labelledby="role-heading">
+        <p className="eyebrow">BİLGİDEN DEĞERLENDİRMEYE</p>
+        <h1 id="role-heading">Her başvuruya<br /><span>daha net bir bakış.</span></h1>
+        <p className="role-intro">Başvurunuzu hazırlayın ya da yönetici olarak yanıtları ve ön inceleme gerekçelerini değerlendirin.</p>
+        <div className="role-cards">
+          <button className="role-card" onClick={() => dispatch({ type: "role", role: "applicant" })}><span className="role-icon"><UserRound /></span><span className="role-kicker">BAŞVURU SAHİBİ</span><strong>Bir sonraki yolculuğa<br />ilk adım.</strong><span className="role-description">Bilgilerinizi dört adımda tamamlayın, kontrol edin ve incelemeye gönderin.</span><span className="role-action">Başvuru sahibi olarak devam et <ArrowRight /></span></button>
+          <button className="role-card admin-role-card" onClick={() => dispatch({ type: "role", role: "admin" })}><span className="role-icon"><LayoutDashboard /></span><span className="role-kicker">YÖNETİCİ</span><strong>Yanıtları görün.<br />Kararı siz verin.</strong><span className="role-description">Başvuruları karşılaştırın, AI değerlendirmesini inceleyin ve demo kararını kaydedin.</span><span className="role-action">Yönetici olarak devam et <ArrowRight /></span></button>
         </div>
-        <div className="nav-label">ÇALIŞMA ALANI</div>
-        <nav aria-label="Ana gezinme">
-          <button
-            onClick={() => setView("review")}
-            aria-current={view === "review" ? "page" : undefined}
-            className={`nav-item ${view === "review" ? "active" : ""}`}
-          >
-            <FileSearch />
-            Başvuru İncele{view === "review" && <span className="nav-dot" />}
-          </button>
-          <button
-            onClick={() => setView("how")}
-            aria-current={view === "how" ? "page" : undefined}
-            className={`nav-item ${view === "how" ? "active" : ""}`}
-          >
-            <BookOpen />
-            Nasıl Çalışır
-          </button>
-        </nav>
-        <div className="rail-bottom">
-          <div className="rail-note">
-            <ShieldCheck className="mb-3 size-5 text-primary" />
-            <p className="text-xs font-medium">Kanıta dayalı, insan odaklı.</p>
-            <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-              Bilgileri netleştirin.
-              <br />
-              Son değerlendirme sizde.
-            </p>
-          </div>
-          <div className="mt-5 flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>VizeLens · Prototip v0.1</span>
-            <PanelLeftClose className="size-3.5" aria-hidden="true" />
-          </div>
-        </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <div className="flex items-center gap-2 text-xs text-white">
-            <span className="hidden sm:inline">Çalışma alanı</span>
-            <span className="hidden text-white/80 sm:inline">/</span>
-            <span className="font-medium text-white">
-              {view === "review" ? "Başvuru inceleme" : "Nasıl çalışır"}
-            </span>
-          </div>
-          <span className="flex items-center gap-1.5 text-[10px] text-white sm:text-xs">
-            <span className="size-1.5 shrink-0 rounded-full bg-white" />
-            {aiStatusLabel(ai)}
-          </span>
-        </header>
-        <main id="main" tabIndex={-1} className="workspace-main">
-          <div hidden={view !== "review"}>
-            <div className="page-heading workflow-heading">
-              <div>
-                <div className="eyebrow mb-2">BAŞVURU ÖN İNCELEMESİ</div>
-                <h1 className="page-title">
-                  Ayrıntıları görün, soruları netleştirin.
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  Seyahat bilgilerini bir araya getirin. Eksikleri ve
-                  tutarsızlıkları,
-                  <br className="hidden xl:block" /> dayanaklarıyla birlikte
-                  inceleyin.
-                </p>
-              </div>
-              <span className="privacy-chip">
-                <LockKeyhole className="size-3.5" />
-                Form bu oturumda tutulur
-              </span>
-            </div>
-            <div className="workflow-container">
-              <div hidden={screen !== "form"}>
-              {report && (
-                <div role="status" className="workflow-notice">
-                  <p>{stale ? "Bilgiler değişti. Son rapor güncel değil; düzenlemelerden sonra yeniden oluşturun." : "Başvurunuzu düzenliyorsunuz. Son raporunuz hazır."}</p>
-                  <Button variant="outline" onClick={() => setScreen("report")}>Son raporu görüntüle</Button>
-                </div>
-              )}
-              {generationError && <p role="alert" className="workflow-notice text-destructive">{generationError}</p>}
-              <ApplicationForm
-                active={screen === "form" && view === "review"}
-                onReview={analyze}
-                analyzing={ai.status === "loading"}
-                onEdited={() => {
-                  cancelPending();
-                  setAI((previous) =>
-                    previous.status === "loading"
-                      ? { status: "unavailable", reason: "cancelled" }
-                      : previous
-                  );
-                  if (report) setStale(true);
-                }}
-                onClear={() => {
-                  cancelPending();
-                  setAI({ status: "local" });
-                  setReport(null);
-                  setStale(false);
-                }}
-              />
-              </div>
-              {screen === "report" && report && (
-                <>
-                  <ReviewReport report={report} stale={stale} ai={ai}
-                    onEdit={() => {
-                      cancelPending();
-                      setAI((previous) => previous.status === "loading" ? { status: "unavailable", reason: "cancelled" } : previous);
-                      setScreen("form");
-                    }} />
-                  {!stale && ai.status === "unavailable" && lastOptions.consented && (
-                    <div className="report-actions mt-4">
-                      <Button variant="outline" onClick={() => analyze(report.application, lastOptions)}>Yapay zekâ incelemesini yeniden dene</Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <footer className="workspace-footer">
-              <span>
-                Örnek tutarlılık kontrolleri · Resmî mevzuat sorgulanmaz
-              </span>
-              <button
-                onClick={() => {
-                  setView("how");
-                  window.scrollTo({ top: 0 });
-                }}
-                className="inline-flex min-h-11 items-center gap-1.5 self-start text-accent hover:underline"
-              >
-                İnceleme yaklaşımımız <ArrowUpRight className="size-3.5" />
-              </button>
-            </footer>
-          </div>
-          {view === "how" && <HowItWorks onStart={() => setView("review")} />}
-        </main>
+        <div className="role-footnotes"><span><FileCheck2 />Kurgusal başvurular</span><span><Sparkles />Yönetici isteğiyle analiz</span><span><ShieldCheck />İnsan kararı</span></div>
+        <p className="session-note">Bunlar demo rol seçimleridir; gerçek kimlik doğrulama değildir.<br />Veriler yalnızca bu oturumda tutulur ve sayfa yenilendiğinde silinir.</p>
+      </section>}
+      <div hidden={state.role !== "applicant"}>
+        {(submitted || showReceipts) ? <ApplicantConfirmation receipts={receipts} onNew={() => { setShowReceipts(false); if (submitted) setDraftNumber((n) => n + 1); }} /> : <>
+          <div className="workspace-heading"><div><p className="eyebrow">BAŞVURU SAHİBİ</p><h1>Yolculuğunuz burada başlıyor.</h1><p>Kurgusal bilgilerinizi tamamlayın ve yönetici incelemesine gönderin.</p></div></div>
+          {receipts.length > 0 && <div className="mb-5 rounded-lg border bg-white p-4 text-sm">Bu oturumda {receipts.length} başvurunuz bulunuyor. <Button variant="ghost" onClick={() => setShowReceipts(true)}>Gönderimlerimi görüntüle</Button></div>}
+          <ApplicationForm key={draftId} active={state.role === "applicant"} onSubmitApplication={(application, acknowledged) => {
+            if (submissions.current.has(draftId)) return;
+            const entry = createCase(application, acknowledged, { id: crypto.randomUUID(), draftId, submittedAt: new Date().toISOString() });
+            submissions.current.add(draftId);
+            dispatch({ type: "submit", entry });
+            requestAnimationFrame(() => { main.current?.focus(); window.scrollTo({ top: 0, behavior: "instant" }); });
+          }} />
+        </>}
       </div>
-    </div>
-  );
+      {state.role === "admin" && (selected ? <AdminDetail key={selected.id} entry={selected} onBack={() => setSelectedId(null)} onAnalyze={() => void analyze(selected.id)} onNote={(note) => dispatch({ type: "note", id: selected.id, note })} onDecision={(input) => dispatch({ type: "decision", id: selected.id, input, at: new Date().toISOString() })} /> :
+        <AdminList cases={state.cases} onSeed={seed} onOpen={(id) => { dispatch({ type: "open", id }); setSelectedId(id); }} />)}
+    </main>
+    <footer className="demo-footer no-print"><span>VizeLens · Sınıf prototipi</span><span>Yalnızca oturum belleği · Yenilemede silinir</span></footer>
+  </div>;
 }

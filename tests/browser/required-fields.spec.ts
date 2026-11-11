@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loadSample, next, generate } from "./flow-helpers";
+import { loadSample, next, submit } from "./flow-helpers";
 
 test("required fields block every step, with visible errors and focus", async ({ page }) => {
   await page.goto("/");
@@ -36,15 +36,12 @@ test("required fields block every step, with visible errors and focus", async ({
   await next(page);
   await expect(page.getByText("Adım 4 / 4", { exact: true })).toBeVisible();
   await expect(page.locator("#form-step-title")).toBeFocused();
-  await field("notes").fill("");
-  await expect(field("notes")).toHaveValue("");
-  await field("narratives.fictionalExcerpts").fill("");
-  await page.getByRole("button", { name: "İnceleme raporu oluştur", exact: true }).click();
-  await expect(field("notes")).toBeFocused();
-  await expect(page.locator("#review-report")).toHaveCount(0);
-  await field("notes").fill("Kurgusal inceleme notu.");
-  await field("narratives.fictionalExcerpts").fill("Kurgusal otel özeti: 10 gece.");
-  await generate(page);
+  await expect(field("notes")).toHaveCount(0);
+  await expect(field("narratives.fictionalExcerpts")).toHaveCount(0);
+  await page.getByRole("button", { name: "Başvuruyu gönder", exact: true }).click();
+  await expect(page.locator("#submission-consent")).toBeFocused();
+  await expect(page.locator("#submission-consent-error")).toContainText("analiz bilgilendirmesini");
+  await submit(page);
 });
 
 test("incomplete sample cannot skip required profile answers", async ({ page }) => {

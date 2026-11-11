@@ -66,7 +66,7 @@ export function ApplicantProfileFields({ form, group }: {
   if (group === "personal") return (
     <>
       <p className="text-sm leading-6 text-muted-foreground">
-        Bu bilgiler zorunludur ve rapora eklenir. AI seçeneği ve onayınızla uygulanabilir tüm yanıtlar OpenAI’a gönderilir.
+        Bu bilgiler başvurunuza eklenir. Gönderim onayınızla yönetici, uygulanabilir yanıtları OpenAI üzerinden analiz edebilir.
       </p>
       <div className="form-grid">
         {select("employmentSector", employmentSectors)}
@@ -87,7 +87,7 @@ export function ApplicantProfileFields({ form, group }: {
       {profile.hasValidVisaOrResidence === "Evet" && input("visaOrResidenceCountries", { max: 500, hint: "Ülkeleri virgülle ayırın. Vize veya oturum izni olduğunu belirtebilirsiniz." })}
       {select("hasVisaRefusal", ["Evet", "Hayır"])}
       {profile.hasVisaRefusal === "Evet" && input("visaRefusalCountries", { max: 500, hint: "Ülkeleri virgülle ayırın." })}
-      {profile.hasVisaRefusal === "Evet" && input("refusalExplanation", { max: 1000, hint: "Ret gerekçesini veya açıklamanızı yazın. AI seçeneği ve onayınızla bu açıklama da OpenAI’a gönderilir." })}
+      {profile.hasVisaRefusal === "Evet" && input("refusalExplanation", { max: 1000, hint: "Ret gerekçesini veya açıklamanızı yazın. Bu açıklama da başvurunuza eklenir." })}
       {select("hasForeignLanguages", ["Evet", "Hayır"])}
       {profile.hasForeignLanguages === "Evet" && input("foreignLanguages", { hint: "Örn. İngilizce, Almanca." })}
       {select("hasRelativesAtDestination", ["Evet", "Hayır"])}
@@ -100,7 +100,7 @@ export function ApplicantProfileFields({ form, group }: {
       {select("hasAssets", ["Evet", "Hayır"])}
       {profile.hasAssets === "Evet" && choices("assets", assetTypes)}
       {choices("fundingMethods", fundingMethods)}
-      <p className="text-sm leading-6 text-muted-foreground">Varlık ve ödeme yöntemi bilgileri insan incelemesi için rapora eklenir.</p>
+      <p className="text-sm leading-6 text-muted-foreground">Varlık ve ödeme yöntemi bilgileri başvurunuza eklenir.</p>
     </>
   );
 }

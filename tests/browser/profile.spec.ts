@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loadSample, next, editStep, generate } from "./flow-helpers";
+import { loadSample, next, submit, openSubmitted } from "./flow-helpers";
 
 test("conditional profile answers survive toggling but inactive details never reach summaries or reports", async ({ page }) => {
   await page.goto("/");
@@ -34,22 +34,13 @@ test("conditional profile answers survive toggling but inactive details never re
   await expect(summary.getByText("Mimar", { exact: true })).toBeVisible();
   await expect(summary.getByText("Kuzen", { exact: true })).toBeVisible();
   await expect(summary.getByText("Fransa", { exact: true })).toHaveCount(0);
-  await generate(page);
-  const report = page.locator("#review-report");
-  await expect(report.getByText("Mimar", { exact: true })).toBeVisible();
-  await expect(report.getByText("Kuzen", { exact: true })).toBeVisible();
-  await expect(report.getByText("Fransa", { exact: true })).toHaveCount(0);
-  await expect(report.getByText("Ev, Araba", { exact: true })).toHaveCount(0);
-  await editStep(page, 2);
-  await profile("hasVisaRefusal").selectOption("Evet");
-  await expect(profile("visaRefusalCountries")).toHaveValue("Fransa");
-  await loadSample(page, "missing");
-  await next(page);
-  await expect(profile("occupation")).toHaveValue("");
-  await expect(profile("hasVisaRefusal")).toHaveValue("");
-  await expect(profile("hasRelativesAtDestination")).toHaveValue("");
-  await expect(profile("relativeRelationship")).toHaveCount(0);
-  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0);
-  await page.getByRole("button", { name: "Temizle", exact: true }).click();
-  await expect(page.getByText("Adım 1 / 4", { exact: true })).toBeVisible();
+  await submit(page);
+  await openSubmitted(page);
+  const answers = page.locator("#submitted-answers");
+  await expect(answers.getByText("Mimar", { exact: true })).toBeVisible();
+  await expect(answers.getByText("Kuzen", { exact: true })).toBeVisible();
+  await expect(answers.getByText("Fransa", { exact: true })).toHaveCount(0);
+  await expect(answers.locator('[data-field-id="profile.assets"]')).toHaveCount(0);
+  await expect(answers.locator('[data-field-id="profile.refusalExplanation"]')).toHaveCount(0);
+  await expect(answers.locator('[data-field-id="narratives.funding"] dd')).toContainText("birikimimden");
 });

@@ -22,6 +22,9 @@ import { analyzeRequest, MAX_BODY_BYTES } from "../src/server/analyze.ts";
 
 const input = () => toAIRequest(getSample("clarification", "2026-01-01"));
 const output = (): AIOutput => ({
+  concernLevel: "medium", evidenceSufficiency: "sufficient",
+  concernExplanation: "Konaklama açıklaması ile alıntı arasındaki fark açıklanmalı.",
+  concernEvidence: [{ fieldId: "narratives.accommodation", value: "Tüm seyahat boyunca aynı otelde" }],
   overallAssessment: "clarification_required",
   summary: "Finansman açıklamasının ayrıntılandırılması gerekiyor.",
   consistentPoints: [],
@@ -154,7 +157,7 @@ test("server validates the complete application and applicable follow-ups before
     (a: Application) => { a.profile.age = "121"; },
     (a: Application) => { a.profile.occupation = ""; },
     (a: Application) => { a.profile.hasVisaRefusal = "Evet"; a.profile.refusalExplanation = ""; },
-    (a: Application) => { a.notes = ""; },
+    (a: Application) => { a.notes = "x".repeat(2001); },
     (a: Application) => { a.narratives.funding = "x".repeat(2001); },
     (a: Application) => { a.returnDate = "2020-01-01"; },
     (a: Application) => { a.stays = Array.from({ length: 21 }, () => a.stays[0]); },
@@ -202,7 +205,7 @@ test("structured assessment validates evidence, shape, priority, overall status 
   assert.equal(validateAIOutput(pureBudget, input()), null);
   const wrongPositive = output(); wrongPositive.consistentPoints = [{ explanation: "Bütçe yeterli.", evidence: [{ fieldId: "budget", value: input().application.budget }] }];
   assert.equal(validateAIOutput(wrongPositive, input()), null);
-  const empty = { ...output(), overallAssessment: "no_material_concern_identified", findings: [] };
+  const empty = { ...output(), concernLevel: "low", overallAssessment: "no_material_concern_identified", findings: [], consistentPoints: [{ explanation: "Turistik seyahat açıklanmış.", evidence: [{ fieldId: "narratives.travelPurpose", value: "Müzeleri" }] }] };
   assert.ok(validateAIOutput(empty, toAIRequest(getSample("consistent"))));
 });
 
@@ -457,9 +460,52 @@ test("client posts only the allowlisted payload and validates the route response
     { status: "unavailable", reason: "cancelled" }
   );
   assert.deepEqual(
-    await requestAI(input(), new AbortController().signal, async () =>
+    await requestAI(toAIRequest(getSample("consistent")), new AbortController().signal, async () =>
       Response.json({ status: "success", result: { ...output(), findings: [] } })
     ),
-    { status: "success", result: { ...output(), findings: [] } }
+    { status: "unavailable", reason: "invalid_response" }
   );
+});
+
+test("concern levels require evidence, supporting findings and substantive sufficiency", () => {
+  const consistentInput = toAIRequest(getSample("consistent"));
+  const low = { ...output(), concernLevel: "low", overallAssessment: "no_material_concern_identified", findings: [], consistentPoints: [{ explanation: "Turistik plan belirtilmiş.", evidence: [{ fieldId: "narratives.travelPurpose", value: "Müzeleri" }] }] };
+  assert.ok(validateAIOutput(low, consistentInput));
+  assert.equal(validateAIOutput({ ...low, consistentPoints: [] }, consistentInput), null);
+  assert.equal(validateAIOutput({ ...low, consistentPoints: [{ explanation: "On gece.", evidence: [{ fieldId: "budget", value: "3200" }] }] }, consistentInput), null);
+  assert.equal(validateAIOutput(low, input()), null);
+  for (const concernLevel of ["medium", "high"] as const) {
+    assert.ok(validateAIOutput({ ...output(), concernLevel }, input()));
+    assert.equal(validateAIOutput({ ...output(), concernLevel, findings: [] }, consistentInput), null);
+  }
+  const unable = { ...output(), concernLevel: "unable_to_assess", evidenceSufficiency: "insufficient", overallAssessment: "insufficient_information", findings: [] };
+  assert.ok(validateAIOutput(unable, input()));
+  assert.equal(validateAIOutput({ ...unable, concernLevel: "low" }, consistentInput), null);
+  assert.equal(validateAIOutput({ ...unable, evidenceSufficiency: "sufficient" }, input()), null);
+  assert.equal(validateAIOutput({ ...low, evidenceSufficiency: "insufficient" }, consistentInput), null);
+  assert.equal(validateAIOutput({ ...output(), concernEvidence: [{ fieldId: "invented", value: "Fake" }] }, input()), null);
+  assert.equal(validateAIOutput({ ...output(), concernExplanation: "Vize kabul olasılığı %90" }, input()), null);
+  assert.equal(validateAIOutput({ ...output(), concernEvidence: [{ fieldId: "profile.age", value: "32" }] }, input()), null);
+  const familyOnly = output();
+  familyOnly.findings[0].evidence = [{ fieldId: "profile.hasRelativesAtDestination", value: "Hayır" }];
+  assert.equal(validateAIOutput(familyOnly, input()), null);
+});
+
+test("optional legacy notes and fictional excerpts can be empty without weakening applicant explanations", () => {
+  const application = getSample("consistent");
+  application.notes = ""; application.narratives.fictionalExcerpts = "";
+  assert.ok(aiRequestSchema.safeParse(toAIRequest(application)).success);
+  application.narratives.funding = " ";
+  assert.equal(applicationSchema.safeParse(application).success, false);
+});
+
+test("authoritative local findings can support concern without forcing duplicate model findings", () => {
+  const data = input();
+  const result = { ...output(), findings: [], concernEvidence: [
+    { fieldId: "budget", value: data.application.budget },
+    { fieldId: "estimatedCost", value: data.application.estimatedCost },
+  ], concernExplanation: "Yerel kontrol, bütçe ile girilen maliyet tahmini arasında fark belirledi." };
+  assert.ok(validateAIOutput(result, data));
+  const consistentData = toAIRequest(getSample("consistent"));
+  assert.equal(validateAIOutput({ ...result, concernEvidence: [{ fieldId: "budget", value: consistentData.application.budget }] }, consistentData), null);
 });

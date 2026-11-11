@@ -1,33 +1,16 @@
 import { test, expect } from "@playwright/test";
-import { loadSample, finalStep, next } from "./flow-helpers";
+import { loadSample, finalStep, submit, openSubmitted } from "./flow-helpers";
 
-test("reload resets form controls without hydration errors or unlocked steps", async ({ page }) => {
+test("refresh clears submitted cases, roles and drafts without hydration errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error" || /hydration|hydrated/i.test(message.text()))
-      errors.push(message.text());
-  });
-  await page.goto("/");
-  await expect(page.locator("form")).toHaveAttribute("autocomplete", "off");
-  await loadSample(page);
-  await finalStep(page);
-  const steps = page.locator(".step-navigation button");
-  for (let index = 0; index < 4; index++) await expect(steps.nth(index)).toBeEnabled();
-  await page.getByRole("radio", { name: "Yerel kontroller + AI Ön Değerlendirme", exact: true }).check();
-  await page.getByRole("checkbox", { name: /Gönderilecek tüm başvuru yanıtlarını kontrol ettim/ }).check();
-
+  page.on("console", (message) => { if (/hydration|hydrated/i.test(message.text())) errors.push(message.text()); });
+  await page.goto("/"); await loadSample(page); await finalStep(page); await submit(page); await openSubmitted(page);
   await page.reload();
-  await expect(page.getByText("Adım 1 / 4", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Başvuru referansı")).toHaveValue("");
-  await expect(page.getByLabel("Gidiş tarihi")).toHaveValue("");
-  await expect(page.locator('input[name="analysis-mode"]').first()).toBeChecked();
-  await expect(page.locator('input[name="ai-consent"]')).toHaveCount(0);
-  await expect(steps.first()).toBeEnabled();
-  for (let index = 1; index < 4; index++) await expect(steps.nth(index)).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Geri", exact: true })).toBeDisabled();
-  await next(page);
-  await expect(page.getByLabel("Başvuru referansı")).toBeFocused();
-  await expect(page.locator("#review-report")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /Her başvuruya/ })).toBeVisible();
+  await page.getByRole("button", { name: /Yönetici olarak devam et/ }).click();
+  await expect(page.getByText("İlk başvuru için hazır", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Başvuru sahibine geç" }).click();
+  await expect(page.locator('[name="reference"]')).toHaveValue("");
   expect(errors).toEqual([]);
 });

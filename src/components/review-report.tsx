@@ -36,15 +36,21 @@ export function ReviewReport({
   stale,
   ai,
   onEdit,
+  showActions = true,
+  focusOnMount = true,
+  showApplicationDetails = true,
 }: {
   report: Review | null;
   stale: boolean;
   ai: AIState;
-  onEdit: () => void;
+  onEdit?: () => void;
+  showActions?: boolean;
+  focusOnMount?: boolean;
+  showApplicationDetails?: boolean;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    if (!report) return;
+    if (!report || !focusOnMount) return;
     // Run after the new report commits. Moving focus also dismisses a mobile
     // input keyboard; later AI updates must not pull focus away again.
     const heading = headingRef.current;
@@ -55,7 +61,7 @@ export function ReviewReport({
         : "smooth",
       block: "start",
     });
-  }, [report]);
+  }, [report, focusOnMount]);
   const [copyStatus, setCopyStatus] = useState<{
     report: Review;
     message: string;
@@ -212,9 +218,9 @@ export function ReviewReport({
               </span>
             </div>
           )}
-          <div className="report-actions mb-5">
+          {onEdit && <div className="report-actions mb-5">
             <Button type="button" variant="outline" onClick={onEdit}>Başvuruyu düzenle</Button>
-          </div>
+          </div>}
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-[1_1_16rem]">
               <div className="eyebrow">ÖN İNCELEME</div>
@@ -231,7 +237,7 @@ export function ReviewReport({
                 {formatDate(report.application.returnDate)}
               </p>
             </div>
-            <div className="report-actions flex flex-wrap gap-2">
+            <div hidden={!showActions} className="report-actions flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="icon"
@@ -361,7 +367,7 @@ export function ReviewReport({
             )}
           </div>
           <AIObservations state={ai} application={report.application} />
-          {profileEntries(report.application.profile).length > 0 && (
+          {showApplicationDetails && profileEntries(report.application.profile).length > 0 && (
             <section className="mt-6 border-t pt-5" aria-labelledby="profile-summary-title">
               <h3 id="profile-summary-title" className="text-sm font-semibold">Ek başvuru bilgileri</h3>
               <p className="my-3 text-sm leading-6 text-muted-foreground">
@@ -377,7 +383,7 @@ export function ReviewReport({
               </dl>
             </section>
           )}
-          <div className="mt-6 border-t pt-5">
+          {showApplicationDetails && <div className="mt-6 border-t pt-5">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <Info className="size-3.5" />
               Kullanılan bilgiler
@@ -423,7 +429,7 @@ export function ReviewReport({
               kullanıldı. Ülke yalnızca bağlamdır. Serbest açıklama kurallarda
               değerlendirilmez.
             </p>
-          </div>
+          </div>}
         </div>
       )}
       <div className="report-scope border-t bg-muted px-6 py-5">

@@ -10,9 +10,13 @@ export function assessmentFixture(overrides: Partial<AIOutput> = {}): AIOutput {
     insufficient_information: "Mevcut açıklamalar anlamlı bir değerlendirme için yetersiz.",
   };
   return {
+    concernLevel: status === "insufficient_information" ? "unable_to_assess" : status === "no_material_concern_identified" ? "low" : "medium",
+    evidenceSufficiency: status === "insufficient_information" ? "insufficient" : "sufficient",
+    concernExplanation: "Gönderilen seyahat açıklaması üzerinden sınırlı ön inceleme yapıldı.",
+    concernEvidence: [{ fieldId: "narratives.travelPurpose", value: "Müzeleri" }],
     overallAssessment: "no_material_concern_identified",
     summary: summaries[status],
-    findings: [], consistentPoints: [],
+    findings: [], consistentPoints: [{ explanation: "Seyahat açıklaması turistik gezi planını belirtiyor.", evidence: [{ fieldId: "narratives.travelPurpose", value: "Müzeleri" }] }],
     limitations: ["Belgeler doğrulanmadı. Resmî vize uygunluğu belirlenemez."],
     ...overrides,
   };

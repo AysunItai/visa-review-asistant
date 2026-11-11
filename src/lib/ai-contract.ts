@@ -91,11 +91,17 @@ export const assessmentLabels = {
   significant_concerns_identified: "Önemli açıklama gerektiren konular belirlendi",
   insufficient_information: "Değerlendirme için bilgi yetersiz",
 } as const;
+export const concernLabels = { low: "Düşük", medium: "Orta", high: "Yüksek", unable_to_assess: "Değerlendirilemiyor" } as const;
+export const CONCERN_NOTE = "Bu düzey, gönderilen bilgilerdeki açıklama ve tutarlılık sorunlarını anlatır; vize reddinin hesaplanmış olasılığı değildir. Nihai demo kararı yöneticiye aittir.";
 export const priorityLabels = { low: "Düşük öncelik", medium: "Orta öncelik", high: "Yüksek öncelik" } as const;
 const evidenceSchema = z.array(z.strictObject({
   fieldId: z.string().min(1).max(100), value: z.string().min(1).max(1000),
 })).min(1).max(6);
 export const aiOutputSchema = z.strictObject({
+  concernLevel: z.enum(["low", "medium", "high", "unable_to_assess"]),
+  concernExplanation: z.string().trim().min(1).max(1200),
+  concernEvidence: evidenceSchema,
+  evidenceSufficiency: z.enum(["sufficient", "insufficient"]),
   overallAssessment: z.enum(["no_material_concern_identified", "clarification_required", "significant_concerns_identified", "insufficient_information"]),
   summary: z.string().trim().min(1).max(1200),
   findings: z.array(z.strictObject({
@@ -133,15 +139,20 @@ export function validateAIOutput(raw: unknown, input: AIRequest): AIOutput | nul
   const result = parsed.data;
   const sources = new Map(evidenceSources(input).map((s) => [s.fieldId, s.value]));
   const local = reviewValidatedContext(input.application);
+  if ((result.concernLevel === "unable_to_assess") !== (result.evidenceSufficiency === "insufficient")) return null;
+  if ((result.concernLevel === "unable_to_assess") !== (result.overallAssessment === "insufficient_information")) return null;
+  if (["medium", "high"].includes(result.concernLevel) && !result.findings.length && !local.findings.length) return null;
+  // Zero local issues alone never establishes a low concern level.
+  if (result.concernLevel === "low" && (local.findings.length || result.findings.length || !result.consistentPoints.length || result.overallAssessment !== "no_material_concern_identified")) return null;
   if (result.overallAssessment === "no_material_concern_identified" && (local.findings.length || result.findings.length)) return null;
   if (result.overallAssessment === "significant_concerns_identified" && !result.findings.some((f) => f.priority === "high")) return null;
   if (result.overallAssessment === "clarification_required" && !result.findings.length && !local.findings.length) return null;
   if (result.findings.some((f) => f.priority === "high") && result.overallAssessment !== "significant_concerns_identified" && result.overallAssessment !== "insufficient_information") return null;
   // Reject obvious personal judgments/predictions without rejecting statements that eligibility cannot be established.
   const prohibited = /güvenilmez|trustworth|(?:risk\s*(?:puan|skor)|(?:kabul|ret|onay)\s*(?:olasılı|ihtimal)|approval\s*probability).{0,20}\d|(?:%\s*\d|\d\s*%).{0,40}(?:vize|onay|ret|kabul)|(?:vize|onay|ret|kabul).{0,40}(?:%\s*\d|\d\s*%)|vize(?:niz)?\s+(?:onaylanacak|reddedilecek|onaylanır|reddedilir)|belgeler(?:iniz)?\s+(?:doğrulandı|onaylandı)/iu;
-  const text = [result.summary, ...result.limitations, ...result.consistentPoints.map((p) => p.explanation), ...result.findings.flatMap((f) => [f.title, f.explanation, f.clarificationQuestion])].join("\n");
+  const text = [result.concernExplanation, result.summary, ...result.limitations, ...result.consistentPoints.map((p) => p.explanation), ...result.findings.flatMap((f) => [f.title, f.explanation, f.clarificationQuestion])].join("\n");
   if (prohibited.test(text)) return null;
-  for (const item of [...result.findings, ...result.consistentPoints]) {
+  for (const item of [{ evidence: result.concernEvidence }, ...result.findings, ...result.consistentPoints]) {
     for (const evidence of item.evidence) {
       const value = sources.get(evidence.fieldId);
       if (value === undefined || !evidence.value.trim() || !value.includes(evidence.value)) return null;
@@ -149,8 +160,11 @@ export function validateAIOutput(raw: unknown, input: AIRequest): AIOutput | nul
       if (!/^(narratives\.|notes$|profile\.(occupation|visaOrResidenceCountries|visaRefusalCountries|refusalExplanation|foreignLanguages|relativeRelationship|relativesDetails)$)/.test(evidence.fieldId) && value !== evidence.value) return null;
     }
   }
-  const demographicOnly = /^profile\.(age|maritalStatus|birthCountry|hasForeignLanguages|foreignLanguages|hasAssets|assets|visitedCountryCount|travelRegions)$/;
+  const demographicOnly = /^profile\.(age|maritalStatus|birthCountry|hasForeignLanguages|foreignLanguages|hasAssets|assets|visitedCountryCount|travelRegions|hasRelativesAtDestination|relativeRelationship|relativesDetails)$/;
   if (result.findings.some((f) => f.evidence.every((e) => demographicOnly.test(e.fieldId)))) return null;
+  if (["medium", "high"].includes(result.concernLevel) && result.concernEvidence.every((e) => demographicOnly.test(e.fieldId))) return null;
+  // Even a positive assessment must address the narrative, not just numeric checks or demographics.
+  if (result.concernLevel === "low" && !result.consistentPoints.some((p) => p.evidence.some((e) => /^narratives\.(travelPurpose|funding|accommodation)$/.test(e.fieldId)))) return null;
   // Pure date/budget findings belong to the deterministic section, never a second model-generated calculation.
   const deterministicField = (id: string) => /^(departure|returnDate|budget|estimatedCost|currency)$|^stays\.\d+\.(checkIn|checkOut|type)$/.test(id);
   if (result.findings.some((f) => f.evidence.every((e) => deterministicField(e.fieldId)))) return null;
@@ -177,14 +191,14 @@ export const aiResponseSchema = z.discriminatedUnion("status", [
 export type AIResponse = z.infer<typeof aiResponseSchema>;
 export type AIState = AIResponse | { status: "local" } | { status: "loading" };
 export const aiFailureMessages: Record<AIFailureReason, string> = {
-  consent_required: "Harici gönderim onayı verilmedi. AI isteği gönderilmedi; yerel rapor kullanılabilir.",
+  consent_required: "Başvurunun gönderim onayı bulunamadı. AI isteği gönderilmedi; yerel rapor kullanılabilir.",
   not_configured: "AI yapılandırılmamış. Sunucuda OPENAI_API_KEY ve OPENAI_MODEL tanımlanmalı. Bilgileriniz korundu; yapılandırma sonrası yeniden deneyin.",
   timeout: "AI isteği zaman aşımına uğradı. Bilgileriniz korundu; yeniden deneyebilirsiniz. Yerel rapor kullanılabilir.",
   provider_error: "AI sağlayıcısına erişilemedi veya sağlayıcı isteği kabul etmedi. Bilgileriniz korundu; yeniden deneyebilirsiniz.",
   invalid_response: "AI yanıtının biçimi veya dayanakları doğrulanamadı. Yanıt gösterilmedi. Bilgileriniz korundu; yeniden deneyebilirsiniz.",
   invalid_input: "AI için bilgiler doğrulanamadı. Zorunlu alanları, en fazla 20 konaklama kaydını ve metin sınırlarını kontrol edin. Bilgileriniz korundu.",
   privacy: "Yanıtlarda kimlik veya iletişim bilgisi olabilecek metin bulundu. İlgisiz tanımlayıcıları kaldırıp yeniden deneyin. Bilgileriniz korundu; sağlayıcıya gönderilmedi.",
-  cancelled: "Bilgiler değiştiği için AI isteği iptal edildi. Güncel rapor için yeniden analiz edin.",
+  cancelled: "AI isteği iptal edildi. Başvuru korundu; yeniden deneyebilirsiniz.",
   refused: "Sağlayıcı bu istek için değerlendirme üretmedi. Yerel rapor kullanılabilir; bilgileri gözden geçirip yeniden deneyebilirsiniz.",
 };
 export function aiStatusLabel(state: AIState): string {
@@ -198,7 +212,10 @@ export function aiReportText(state: AIState, input: AIRequest): string {
   const sources = new Map(evidenceSources(input).map((s) => [s.fieldId, s.label]));
   const evidenceText = (evidence: AIFinding["evidence"]) => evidence.map((e) => `Dayanak [${e.fieldId}] ${sources.get(e.fieldId)}: ${e.value}`);
   return [
-    "AI Ön Değerlendirme — OpenAI", assessmentLabels[result.overallAssessment], result.summary,
+    "AI Ön Değerlendirme — OpenAI",
+    `Başvuruya ilişkin ön inceleme riski: ${concernLabels[result.concernLevel]}`,
+    result.concernExplanation, ...evidenceText(result.concernEvidence), CONCERN_NOTE,
+    assessmentLabels[result.overallAssessment], result.summary,
     "Yerel kural bulguları önceki bölümde yer alır. Aşağıdakiler AI tarafından belirlenen ek konulardır.",
     ...orderedFindings(result).flatMap((f, i) => [`AI-${i + 1} · ${priorityLabels[f.priority]} · ${f.category}: ${f.title}`, f.explanation, ...evidenceText(f.evidence), `Netleştirme sorusu: ${f.clarificationQuestion}`, ""]),
     "Tutarlı noktalar", ...result.consistentPoints.flatMap((p) => [p.explanation, ...evidenceText(p.evidence)]),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from "react";
 import {
   useFieldArray,
   useForm,
@@ -15,7 +15,6 @@ import {
   FileCheck2,
   Info,
   LoaderCircle,
-  MessageSquareText,
   Plus,
   RotateCcw,
   Sparkles,
@@ -42,19 +41,10 @@ import { getSample, sampleLabels, sampleDescriptions, type SampleKey } from "@/l
 import { applicationSteps, stepForField, validateStep } from "@/lib/application-steps";
 import { dayNumber } from "@/lib/dates";
 import { ApplicationSummary } from "@/components/application-summary";
-import { narrativeFields, type AnalysisOptions } from "@/lib/narratives";
+import { narrativeFields } from "@/lib/narratives";
 
-export function ApplicationForm({
-  onReview,
-  onEdited,
-  onClear,
-  analyzing,
-  active,
-}: {
-  onReview: (application: Application, options: AnalysisOptions) => void;
-  onEdited: () => void;
-  onClear: () => void;
-  analyzing: boolean;
+export function ApplicationForm({ onSubmitApplication, active }: {
+  onSubmitApplication: (application: Application, acknowledged: boolean) => void;
   active: boolean;
 }) {
   const form = useForm<Application>({ defaultValues: emptyApplication() });
@@ -62,12 +52,15 @@ export function ApplicationForm({
   const { fields, append, remove } = useFieldArray({ control, name: "stays" });
   const [sample, setSample] = useState<SampleKey>("clarification");
   const [feedback, setFeedback] = useState("");
-  const [useAI, setUseAI] = useState(false);
+  const submitted = useRef(false);
+  const [sending, setSending] = useState(false);
+  const [consentError, setConsentError] = useState(false);
   const [consented, setConsented] = useState(false);
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const [summary, setSummary] = useState<Application | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const [focusRequest, setFocusRequest] = useState<{ step: number; invalid: boolean } | null>(null);
   const departure = useWatch({ control, name: "departure" });
   const returnDate = useWatch({ control, name: "returnDate" });
   const nights = dayNumber(returnDate) - dayNumber(departure);
@@ -80,7 +73,6 @@ export function ApplicationForm({
     wasActive.current = active;
   }, [active]);
   const currency = useWatch({ control, name: "currency" });
-  const notes = useWatch({ control, name: "notes" });
   const error = (path: FieldPath<Application>) =>
     getFieldState(path, formState).error?.message;
   const accessible = (path: FieldPath<Application>, hint = false) => ({
@@ -91,15 +83,19 @@ export function ApplicationForm({
         .filter(Boolean)
         .join(" ") || undefined,
   });
+  // Focus after the committed step/error DOM is ready, before paint. A delayed
+  // animation-frame callback can steal focus from the next user input on mobile.
+  useLayoutEffect(() => {
+    if (!focusRequest) return;
+    const container = document.getElementById(`application-step-${focusRequest.step}`);
+    const field = focusRequest.invalid ? container?.querySelector<HTMLElement>('[aria-invalid="true"]') : null;
+    const target = field ?? headingRef.current;
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [focusRequest]);
   function focusStep(next: number, invalid = false) {
     setStep(next);
-    requestAnimationFrame(() => {
-      const container = document.getElementById(`application-step-${next}`);
-      const field = invalid ? container?.querySelector<HTMLElement>('[aria-invalid="true"]') : null;
-      const target = field ?? headingRef.current;
-      target?.focus({ preventScroll: true });
-      target?.scrollIntoView({ block: "start", behavior: "auto" });
-    });
+    setFocusRequest({ step: next, invalid });
   }
   function showErrors(issues: { path: PropertyKey[]; message: string }[], final: boolean) {
     const firstStep = final ? Math.min(...issues.map((issue) => stepForField(issue.path.join(".")))) : step;
@@ -115,7 +111,7 @@ export function ApplicationForm({
     setFeedback("Lütfen işaretlenen alanları düzeltin.");
   }
   function navigate(next: number, data: Application) {
-    if (analyzing) return;
+    if (sending) return;
     form.clearErrors();
     if (next > step) {
       const result = validateStep(data, step);
@@ -127,20 +123,34 @@ export function ApplicationForm({
     focusStep(next);
   }
   function submit(data: Application) {
-    if (analyzing) return;
+    if (sending) return;
     if (step < 3) { navigate(step + 1, data); return; }
     form.clearErrors();
     const result = applicationSchema.safeParse(data);
     if (!result.success) { showErrors(result.error.issues, true); return; }
-    onReview(result.data, { useAI, consented });
+    if (!consented) {
+      setConsentError(true);
+      document.getElementById("submission-consent")?.focus();
+      return;
+    }
+    if (submitted.current) return;
+    submitted.current = true;
+    setSending(true);
+    try { onSubmitApplication(result.data, consented); }
+    catch {
+      submitted.current = false;
+      setSending(false);
+      setFeedback("Başvuru gönderilemedi. Bilgileriniz korundu; yeniden deneyin.");
+    }
   }
   function loadSample() {
-    form.reset(getSample(sample));
+    const example = getSample(sample);
+    form.reset({ ...example, notes: "", narratives: { ...example.narratives, fictionalExcerpts: "" } });
     setConsented(false);
-    setUseAI(false);
+    setConsentError(false);
     setReached(0);
     setSummary(null);
-    onClear();
+
     focusStep(0);
     setFeedback("Kurgusal örnek yüklendi. Bilgileri adım adım kontrol edin.");
   }
@@ -149,9 +159,7 @@ export function ApplicationForm({
     const field = narrativeFields[key];
     return (
       <FormField id={path} label={field.label} error={error(path)}
-        hint={key === "fictionalExcerpts"
-          ? "Yalnızca kurgusal belge metni girin. Yapay zekâ incelemesini seçip onay verirseniz OpenAI’a gönderilir."
-          : "Yapay zekâ incelemesini seçip onay verirseniz bu açıklama OpenAI’a gönderilir. Kişi adı, kimlik veya iletişim bilgisi eklemeyin."}>
+        hint="Gönderim onayınızla yönetici bu açıklamayı OpenAI üzerinden analiz edebilir. Yalnızca kurgusal bilgiler kullanın.">
         <textarea required {...register(path)} {...accessible(path, true)} rows={3} maxLength={field.limit}
           className="field-control min-h-24 resize-y py-3" />
       </FormField>
@@ -162,7 +170,7 @@ export function ApplicationForm({
       <div className="sample-bar">
         <div className="flex items-center gap-2 text-sm font-medium text-primary">
           <Sparkles className="size-4" />
-          Bir örnekle başlayın
+          Demo yardımcısı · Kurgusal örnek yükleyin
         </div>
         <div className="sample-controls mt-3">
           <div className="select-wrap flex-1">
@@ -181,7 +189,7 @@ export function ApplicationForm({
             </select>
             <ChevronDown />
           </div>
-          <Button variant="outline" onClick={loadSample} disabled={analyzing} className="text-sm">
+          <Button variant="outline" onClick={loadSample} disabled={sending} className="text-sm">
             Örnek Başvuru Yükle <ArrowRight className="size-3.5" />
           </Button>
         </div>
@@ -197,11 +205,11 @@ export function ApplicationForm({
           if (
             !(
               event.target instanceof HTMLInputElement &&
-              event.target.name === "ai-consent"
+              event.target.name === "submission-consent"
             )
           )
             setConsented(false);
-          onEdited();
+
           setFeedback("");
         }}
         className="form-panel"
@@ -217,7 +225,7 @@ export function ApplicationForm({
             {applicationSteps.map((label, index) => (
               <li key={label}>
                 <button type="button" aria-current={step === index ? "step" : undefined}
-                  aria-label={`${index + 1}. adım: ${label}`} disabled={index > reached || analyzing}
+                  aria-label={`${index + 1}. adım: ${label}`} disabled={index > reached || sending}
                   onClick={() => void form.handleSubmit((data) => navigate(index, data))()}>
                   <span className="step-number">{index + 1}</span><span className="step-name">{label}</span>
                 </button>
@@ -415,7 +423,7 @@ export function ApplicationForm({
                     remove(index);
                     form.clearErrors("stays");
                     setConsented(false);
-                    onEdited();
+
                   }}
                 >
                   <Trash2 className="size-3.5" />
@@ -471,7 +479,7 @@ export function ApplicationForm({
               append({ type: "Otel", checkIn: "", checkOut: "" });
               form.clearErrors("stays");
               setConsented(false);
-              onEdited();
+
             }}
           >
             <Plus />
@@ -520,117 +528,60 @@ export function ApplicationForm({
         </div>
         <div id="application-step-3" hidden={step !== 3}>
         {summary && <ApplicationSummary application={summary} onEdit={(next) => focusStep(next)} />}
-        <Section title="Açıklama" icon={<MessageSquareText />}>
-          <FormField
-            id="notes"
-            label="İnceleme notu"
-            error={error("notes")}
-            hint="AI seçeneği ve onayınızla bu not da OpenAI’a gönderilir. Kimlik/pasaport numarası veya ilgisiz kişisel bilgi girmeyin."
-          >
-            <textarea
-              {...register("notes")}
-              required
-              {...accessible("notes", true)}
-              rows={3}
-              maxLength={2000}
-              placeholder="İnceleme notunuzu buraya yazın…"
-              className="field-control min-h-24 resize-y py-3"
-            />
-            <p className="text-right text-sm text-muted-foreground">
-              {new Intl.NumberFormat("tr-TR").format(notes.length)} / 2.000
-            </p>
-          </FormField>
-        </Section>
-        <Section title="İnceleme yöntemi ve ek açıklama" icon={<Sparkles />}>
-          {narrative("fictionalExcerpts")}
-          <fieldset className="min-w-0 space-y-3 rounded-lg border bg-muted p-4">
-            <legend className="px-1 text-sm font-semibold">
-              İnceleme yöntemi
-            </legend>
-            <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-sm leading-5">
-              <input
-                type="radio"
-                name="analysis-mode"
-                checked={!useAI}
-                onChange={() => {
-                  setUseAI(false);
-                  setConsented(false);
-                }}
-                className="mt-0.5 size-5 shrink-0 accent-accent"
-              />
-              Yalnızca yerel kontroller — dışarıya bilgi gönderilmez
-            </label>
-            <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-sm leading-5">
-              <input
-                type="radio"
-                name="analysis-mode"
-                checked={useAI}
-                onChange={() => setUseAI(true)}
-                className="mt-0.5 size-5 shrink-0 accent-accent"
-              />
-              Yerel kontroller + AI Ön Değerlendirme
-            </label>
-            <p className="text-sm leading-6 text-muted-foreground">
-              AI seçeneğini seçip onay verdiğinizde, uygulanabilir tüm başvuru
-              yanıtlarınız analiz için OpenAI’a gönderilir: referans, kişisel bilgiler,
-              eğitim ve çalışma bilgileri, seyahat ve vize/ret geçmişi, diller,
-              akrabalar, bütçe, ödeme yöntemleri, varlıklar, konaklama, belge
-              beyanları ve inceleme notu dahil tüm açıklamalar. Gizlenen koşullu
-              yanıtlar gönderilmez. Kimlik/pasaport numarası veya ilgisiz iletişim
-              bilgisi yazmayın. Sağlayıcının veri işleme koşulları geçerlidir;
-              istek API kullanım ücreti doğurabilir. Yerel kontrol seçeneği dışarıya bilgi göndermez.
-            </p>
-            {useAI && (
-              <label className="choice-label flex cursor-pointer items-start gap-2 py-2 text-sm leading-5">
-                <input
-                  type="checkbox"
-                  name="ai-consent"
-                  checked={consented}
-                  onChange={(event) => setConsented(event.target.checked)}
-                  className="mt-0.5 size-5 shrink-0 accent-accent"
-                />
-                Gönderilecek tüm başvuru yanıtlarını kontrol ettim. Kişisel profilim,
-                seyahat/finansman bilgilerim ve inceleme notum dahil uygulanabilir tüm
-                yanıtlarımın ön değerlendirme için OpenAI’a gönderilmesini onaylıyorum.
-              </label>
-            )}
-          </fieldset>
+        <Section title="Gönderim onayı" icon={<FileCheck2 />}>
+          <div className="rounded-lg border bg-muted p-4 text-sm leading-6">
+            Başvurunuz bu oturumdaki yönetici çalışma alanına iletilir. Yönetici, uygulanabilir
+            tüm yanıtlarınızı (kişisel profil, seyahat, finansman, konaklama ve açıklamalar)
+            ön inceleme için OpenAI üzerinden analiz edebilir. Gizlenen koşullu yanıtlar gönderilmez.
+            Yalnızca kurgusal bilgi kullanın; kimlik numarası veya iletişim bilgisi girmeyin.
+          </div>
+          <label className="choice-label flex items-start gap-3 text-sm leading-6">
+            <input id="submission-consent" name="submission-consent" type="checkbox"
+              checked={consented} required aria-invalid={consentError}
+              aria-describedby={consentError ? "submission-consent-error" : undefined}
+              onChange={(event) => { setConsented(event.target.checked); setConsentError(false); }}
+              className="mt-1 size-5 shrink-0 accent-accent" />
+            Yanıtlarımı kontrol ettim. Başvurumun yönetici tarafından OpenAI üzerinden
+            analiz edilebileceğini kabul ediyorum.
+          </label>
+          {consentError && <p id="submission-consent-error" role="alert" className="text-sm text-destructive">Göndermek için analiz bilgilendirmesini kabul edin.</p>}
+          <p className="text-sm text-muted-foreground">Bu bir sınıf demosudur. Başvurunuz herhangi bir resmî kuruma gönderilmez.</p>
         </Section>
         </div>
         <div className="wizard-actions border-t bg-muted p-5 sm:px-6">
           <div className="form-actions">
-            <Button type="button" variant="outline" disabled={step === 0 || analyzing}
+            <Button type="button" variant="outline" disabled={step === 0 || sending}
               onClick={() => void form.handleSubmit((data) => navigate(step - 1, data))()}>Geri</Button>
             {step < 3 ? (
-              <Button key="continue" type="button" disabled={analyzing} onClick={(event) => {
+              <Button key="continue" type="button" disabled={sending} onClick={(event) => {
                 event.preventDefault();
                 void form.handleSubmit((data) => navigate(step + 1, data))();
               }}>Devam <ArrowRight /></Button>
             ) : <Button
               key="generate"
               type="submit"
-              disabled={formState.isSubmitting || analyzing}
+              disabled={formState.isSubmitting || sending}
               className="text-sm"
             >
-              {formState.isSubmitting || analyzing ? (
+              {formState.isSubmitting || sending ? (
                 <LoaderCircle className="animate-spin" />
               ) : (
                 <FileCheck2 />
               )}
-              İnceleme raporu oluştur <ArrowRight />
+              Başvuruyu gönder <ArrowRight />
             </Button>}
             <Button
               type="button"
               variant="ghost"
               onClick={() => {
                 form.reset(emptyApplication());
-                setUseAI(false);
+                setConsentError(false);
                 setConsented(false);
-                onClear();
+
                 setReached(0);
                 setSummary(null);
                 focusStep(0);
-                setFeedback("Form ve rapor temizlendi.");
+                setFeedback("Taslak temizlendi.");
               }}
               className="text-sm"
             >
@@ -643,7 +594,7 @@ export function ApplicationForm({
             className="mt-3 text-sm leading-5 text-muted-foreground"
           >
             {feedback ||
-              "Form bilgileri bu sayfanın belleğinde tutulur. AI seçeneği ve onayınız, uygulanabilir tüm yanıtları OpenAI’a gönderir."}
+              "Veriler yalnızca bu oturumda tutulur. Sayfayı yenilemek tüm demo verilerini siler."}
           </p>
         </div>
       </form>

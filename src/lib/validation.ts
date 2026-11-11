@@ -73,7 +73,8 @@ export const applicationSchema = z
       budget: declaration,
       accommodation: declaration,
     }),
-    notes: z.string().trim().min(1, "İnceleme notunu girin.").max(2000, "Açıklama en fazla 2.000 karakter olabilir."),
+    // Legacy field retained for API compatibility; new reviewer notes live on the case.
+    notes: z.string().trim().max(2000, "Açıklama en fazla 2.000 karakter olabilir.").default(""),
     narratives: narrativeSchema,
     profile: profileSchema,
   })

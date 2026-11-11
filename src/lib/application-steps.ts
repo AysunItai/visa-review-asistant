@@ -8,7 +8,7 @@ export const applicationSteps = [
   "Başvuru ve seyahat",
   "Kişisel bilgiler ve seyahat geçmişi",
   "Finansman, konaklama ve belgeler",
-  "Açıklamalar ve inceleme",
+  "Kontrol ve gönderim",
 ] as const;
 const shape = applicationSchema.shape;
 const stepSchemas = [

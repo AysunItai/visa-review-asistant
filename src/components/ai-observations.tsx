@@ -1,7 +1,7 @@
 import { Sparkles, MessageCircleQuestion, LoaderCircle } from "lucide-react";
 import { Badge } from "./ui/badge";
 import {
-  aiFailureMessages, evidenceSources, toAIRequest, assessmentLabels,
+  concernLabels, CONCERN_NOTE, aiFailureMessages, evidenceSources, toAIRequest, assessmentLabels,
   assessmentLimitations, orderedFindings, priorityLabels, type AIState, type AIFinding,
 } from "@/lib/ai-contract";
 import type { Application } from "@/lib/validation";
@@ -35,7 +35,12 @@ export function AIObservations({ state, application }: { state: AIState; applica
       </div>
       {result && <div className="mt-4 space-y-5">
         <div className="rounded-lg border bg-muted p-4">
-          <h4 className="font-semibold text-primary">{assessmentLabels[result.overallAssessment]}</h4>
+          <p className="text-sm font-medium text-muted-foreground">Başvuruya ilişkin ön inceleme riski</p>
+          <h4 className={`concern-level concern-${result.concernLevel}`}>{concernLabels[result.concernLevel]}</h4>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{result.concernExplanation}</p>
+          {evidenceList(result.concernEvidence)}
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">{CONCERN_NOTE}</p>
+          <p className="mt-4 font-semibold text-primary">{assessmentLabels[result.overallAssessment]}</p>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{result.summary}</p>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">Bu durum başvurudaki bilgilerin incelemesini anlatır. Önemli bir sorun tespit edilmemesi vize uygunluğunu veya vize onayını doğrulamaz.</p>
         </div>

@@ -19,9 +19,9 @@ test("each required field blocks its step and final submission when cleared", ()
   for (let step = 0; step < 4; step++) assert.ok(validateStep(complete, step).success);
 
   const cases: [string, (application: Application) => void][] = [];
-  for (const key of ["reference", "departure", "returnDate", "budget", "estimatedCost", "notes"] as const)
+  for (const key of ["reference", "departure", "returnDate", "budget", "estimatedCost"] as const)
     cases.push([key, (application) => { application[key] = ""; }]);
-  for (const key of Object.keys(complete.narratives) as (keyof Application["narratives"])[])
+  for (const key of ["travelPurpose", "funding", "accommodation"] as const)
     cases.push([`narratives.${key}`, (application) => { application.narratives[key] = " \n "; }]);
   for (const key of Object.keys(complete.profile) as (keyof Application["profile"])[])
     cases.push([`profile.${key}`, (application) => { Object.assign(application.profile, { [key]: Array.isArray(application.profile[key]) ? [] : "" }); }]);
@@ -43,7 +43,7 @@ test("each required field blocks its step and final submission when cleared", ()
 
 test("whitespace-only required text fails and inactive answers stay optional", () => {
   const application = completeApplication();
-  for (const key of ["reference", "notes"] as const)
+  for (const key of ["reference"] as const)
     assert.equal(applicationSchema.safeParse({ ...application, [key]: " \n " }).success, false);
   for (const key of ["occupation", "birthCountry", "visaOrResidenceCountries", "visaRefusalCountries", "refusalExplanation", "foreignLanguages", "relativeRelationship", "relativesDetails"] as const)
     assert.equal(applicationSchema.safeParse({ ...application, profile: { ...application.profile, [key]: " \n " } }).success, false, key);

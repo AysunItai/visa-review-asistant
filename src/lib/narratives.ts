@@ -10,7 +10,7 @@ export const narrativeSchema = z.strictObject({
   travelPurpose: z.string().trim().min(1, "Seyahat amacı açıklamasını girin.").max(2000, "En fazla 2.000 karakter girin."),
   funding: z.string().trim().min(1, "Finansman açıklamasını girin.").max(2000, "En fazla 2.000 karakter girin."),
   accommodation: z.string().trim().min(1, "Konaklama açıklamasını girin.").max(2000, "En fazla 2.000 karakter girin."),
-  fictionalExcerpts: z.string().trim().min(1, "Kurgusal belge alıntılarını girin.").max(3000, "En fazla 3.000 karakter girin."),
+  fictionalExcerpts: z.string().trim().max(3000, "En fazla 3.000 karakter girin.").default(""),
 });
 export const emptyNarratives = () => ({
   travelPurpose: "",
