@@ -132,54 +132,69 @@ export function orderedFindings(result: AIOutput): AIFinding[] {
   return [...result.findings].sort((a, b) => order[a.priority] - order[b.priority]);
 }
 
-/** Structural evidence checks are a backstop, not proof of semantic correctness. */
-export function validateAIOutput(raw: unknown, input: AIRequest): AIOutput | null {
+export type AIValidationCode =
+  | "schema" | "sufficiency_mismatch" | "assessment_mismatch" | "unsupported_concern"
+  | "unsupported_low" | "findings_status_mismatch" | "priority_status_mismatch"
+  | "prohibited_claim" | "unknown_or_inexact_evidence" | "partial_structured_evidence"
+  | "demographic_only_concern" | "missing_narrative_support" | "duplicate_local_finding"
+  | "contradicted_consistent_point" | "duplicate_finding";
+type AIValidation = { success: true; result: AIOutput } | { success: false; code: AIValidationCode };
+const invalidAssessment = (code: AIValidationCode): AIValidation => ({ success: false, code });
+
+/** Diagnostics contain fixed codes only, never submitted values or model prose.
+ * Structural evidence checks are a backstop, not proof of semantic correctness. */
+export function inspectAIOutput(raw: unknown, input: AIRequest): AIValidation {
   const parsed = aiOutputSchema.safeParse(raw);
-  if (!parsed.success) return null;
+  if (!parsed.success) return invalidAssessment("schema");
   const result = parsed.data;
   const sources = new Map(evidenceSources(input).map((s) => [s.fieldId, s.value]));
   const local = reviewValidatedContext(input.application);
-  if ((result.concernLevel === "unable_to_assess") !== (result.evidenceSufficiency === "insufficient")) return null;
-  if ((result.concernLevel === "unable_to_assess") !== (result.overallAssessment === "insufficient_information")) return null;
-  if (["medium", "high"].includes(result.concernLevel) && !result.findings.length && !local.findings.length) return null;
+  if ((result.concernLevel === "unable_to_assess") !== (result.evidenceSufficiency === "insufficient")) return invalidAssessment("sufficiency_mismatch");
+  if ((result.concernLevel === "unable_to_assess") !== (result.overallAssessment === "insufficient_information")) return invalidAssessment("assessment_mismatch");
+  if (["medium", "high"].includes(result.concernLevel) && !result.findings.length && !local.findings.length) return invalidAssessment("unsupported_concern");
   // Zero local issues alone never establishes a low concern level.
-  if (result.concernLevel === "low" && (local.findings.length || result.findings.length || !result.consistentPoints.length || result.overallAssessment !== "no_material_concern_identified")) return null;
-  if (result.overallAssessment === "no_material_concern_identified" && (local.findings.length || result.findings.length)) return null;
-  if (result.overallAssessment === "significant_concerns_identified" && !result.findings.some((f) => f.priority === "high")) return null;
-  if (result.overallAssessment === "clarification_required" && !result.findings.length && !local.findings.length) return null;
-  if (result.findings.some((f) => f.priority === "high") && result.overallAssessment !== "significant_concerns_identified" && result.overallAssessment !== "insufficient_information") return null;
+  if (result.concernLevel === "low" && (local.findings.length || result.findings.length || !result.consistentPoints.length || result.overallAssessment !== "no_material_concern_identified")) return invalidAssessment("unsupported_low");
+  if (result.overallAssessment === "no_material_concern_identified" && (local.findings.length || result.findings.length)) return invalidAssessment("findings_status_mismatch");
+  if (result.overallAssessment === "significant_concerns_identified" && !result.findings.some((f) => f.priority === "high")) return invalidAssessment("priority_status_mismatch");
+  if (result.overallAssessment === "clarification_required" && !result.findings.length && !local.findings.length) return invalidAssessment("findings_status_mismatch");
+  if (result.findings.some((f) => f.priority === "high") && result.overallAssessment !== "significant_concerns_identified" && result.overallAssessment !== "insufficient_information") return invalidAssessment("priority_status_mismatch");
   // Reject obvious personal judgments/predictions without rejecting statements that eligibility cannot be established.
   const prohibited = /güvenilmez|trustworth|(?:risk\s*(?:puan|skor)|(?:kabul|ret|onay)\s*(?:olasılı|ihtimal)|approval\s*probability).{0,20}\d|(?:%\s*\d|\d\s*%).{0,40}(?:vize|onay|ret|kabul)|(?:vize|onay|ret|kabul).{0,40}(?:%\s*\d|\d\s*%)|vize(?:niz)?\s+(?:onaylanacak|reddedilecek|onaylanır|reddedilir)|belgeler(?:iniz)?\s+(?:doğrulandı|onaylandı)/iu;
   const text = [result.concernExplanation, result.summary, ...result.limitations, ...result.consistentPoints.map((p) => p.explanation), ...result.findings.flatMap((f) => [f.title, f.explanation, f.clarificationQuestion])].join("\n");
-  if (prohibited.test(text)) return null;
+  if (prohibited.test(text)) return invalidAssessment("prohibited_claim");
   for (const item of [{ evidence: result.concernEvidence }, ...result.findings, ...result.consistentPoints]) {
     for (const evidence of item.evidence) {
       const value = sources.get(evidence.fieldId);
-      if (value === undefined || !evidence.value.trim() || !value.includes(evidence.value)) return null;
+      if (value === undefined || !evidence.value.trim() || !value.includes(evidence.value)) return invalidAssessment("unknown_or_inexact_evidence");
       // Short quotations are allowed only from prose. Numeric, date, enum and list values must match exactly.
-      if (!/^(narratives\.|notes$|profile\.(occupation|visaOrResidenceCountries|visaRefusalCountries|refusalExplanation|foreignLanguages|relativeRelationship|relativesDetails)$)/.test(evidence.fieldId) && value !== evidence.value) return null;
+      if (!/^(narratives\.|notes$|profile\.(occupation|visaOrResidenceCountries|visaRefusalCountries|refusalExplanation|foreignLanguages|relativeRelationship|relativesDetails)$)/.test(evidence.fieldId) && value !== evidence.value) return invalidAssessment("partial_structured_evidence");
     }
   }
   const demographicOnly = /^profile\.(age|maritalStatus|birthCountry|hasForeignLanguages|foreignLanguages|hasAssets|assets|visitedCountryCount|travelRegions|hasRelativesAtDestination|relativeRelationship|relativesDetails)$/;
-  if (result.findings.some((f) => f.evidence.every((e) => demographicOnly.test(e.fieldId)))) return null;
-  if (["medium", "high"].includes(result.concernLevel) && result.concernEvidence.every((e) => demographicOnly.test(e.fieldId))) return null;
+  if (result.findings.some((f) => f.evidence.every((e) => demographicOnly.test(e.fieldId)))) return invalidAssessment("demographic_only_concern");
+  if (["medium", "high"].includes(result.concernLevel) && result.concernEvidence.every((e) => demographicOnly.test(e.fieldId))) return invalidAssessment("demographic_only_concern");
   // Even a positive assessment must address the narrative, not just numeric checks or demographics.
-  if (result.concernLevel === "low" && !result.consistentPoints.some((p) => p.evidence.some((e) => /^narratives\.(travelPurpose|funding|accommodation)$/.test(e.fieldId)))) return null;
+  if (result.concernLevel === "low" && !result.consistentPoints.some((p) => p.evidence.some((e) => /^narratives\.(travelPurpose|funding|accommodation)$/.test(e.fieldId)))) return invalidAssessment("missing_narrative_support");
   // Pure date/budget findings belong to the deterministic section, never a second model-generated calculation.
   const deterministicField = (id: string) => /^(departure|returnDate|budget|estimatedCost|currency)$|^stays\.\d+\.(checkIn|checkOut|type)$/.test(id);
-  if (result.findings.some((f) => f.evidence.every((e) => deterministicField(e.fieldId)))) return null;
+  if (result.findings.some((f) => f.evidence.every((e) => deterministicField(e.fieldId)))) return invalidAssessment("duplicate_local_finding");
   // Prevent positive claims based solely on numeric inputs already contradicted by the rules.
   if (result.consistentPoints.some((p) =>
     (local.findings.some((f) => f.ruleId === "budget.shortfall") && p.evidence.every((e) => /^(budget|estimatedCost|currency)$/.test(e.fieldId))) ||
     (local.findings.some((f) => f.ruleId.startsWith("accommodation.")) && p.evidence.every((e) => /^(departure|returnDate)$|^stays\./.test(e.fieldId)))
-  )) return null;
+  )) return invalidAssessment("contradicted_consistent_point");
   const signatures = new Set<string>();
   for (const f of result.findings) {
     const signature = `${f.category}:${f.title.toLocaleLowerCase("tr-TR")}`;
-    if (signatures.has(signature)) return null;
+    if (signatures.has(signature)) return invalidAssessment("duplicate_finding");
     signatures.add(signature);
   }
-  return result;
+  return { success: true, result };
+}
+
+export function validateAIOutput(raw: unknown, input: AIRequest): AIOutput | null {
+  const checked = inspectAIOutput(raw, input);
+  return checked.success ? checked.result : null;
 }
 
 export const aiFailureReasons = ["not_configured", "timeout", "provider_error", "invalid_response", "invalid_input", "privacy", "consent_required", "cancelled", "refused"] as const;

@@ -7,7 +7,7 @@ import {
   evidenceSources,
   containsIdentifierLikeText,
   REQUIRED_LIMITATIONS,
-  validateAIOutput,
+  inspectAIOutput,
   type AIFailureReason,
   type AIResponse,
 } from "../lib/ai-contract.ts";
@@ -24,6 +24,7 @@ Review internal contradictions, insufficiently explained funding, travel-purpose
 Every finding and consistent point MUST cite supplied fieldIds and their submitted values. For prose you may quote a verbatim substring (max 1000 characters); for numbers, dates, options and lists copy the entire supplied value exactly. Never cite hidden fields or invent evidence. A No, zero, or Not applicable answer is an answer, not missing information. An inactive follow-up is not missing.
 Use deterministicChecks as authoritative date/budget calculations. They appear separately in the report. Do not repeat, reverse or re-calculate those findings; add only distinct concerns supported by explanations or profile answers. Never report a pure date/budget finding already handled by the rules. Consider local findings in the overall status and summary. Do not claim all funding or accommodation information is consistent if local checks show a discrepancy.
 Status meanings: no_material_concern_identified only when BOTH local findings and AI findings are empty; clarification_required for issues needing clarification; significant_concerns_identified only with at least one high-priority, evidence-supported concern; insufficient_information when the substantive explanations do not support a meaningful review. Priorities measure the need for clarification, NOT a person's risk or visa outcome. Missing reviewed criteria alone is a limitation, not a reason to rate every application insufficient.
+Before returning, check that overallAssessment is insufficient_information if and only if concernLevel is unable_to_assess and evidenceSufficiency is insufficient. Otherwise, any high-priority AI finding requires significant_concerns_identified; issues with no high-priority AI finding require clarification_required. This consistency rule concerns the clarification status, not the separate concernLevel. findings must contain only additional AI concerns: never include an item supported exclusively by dates, stay types, budget, estimatedCost or currency. Explain local-only issues in concernExplanation and concernEvidence instead. Empty optional fields must never be cited as evidence. Copy fieldIds and evidence values exactly as supplied, without translation, formatting changes, ellipses or added units. Do not repeat a category/title pair.
 Do not infer nationality from birthplace. Age, marital status, birthplace, language, property ownership, travel history or having relatives abroad alone must never be treated as evidence of likely refusal. Do not score or label the person or judge trustworthiness/intent. Review relevant statements and evidence in context. Do not predict approval/refusal, invent percentages, risk scores or official decisions.
 No reviewed, sourced visa criteria exist in this project. The server supplies reviewedVisaCriteria as an empty list. Explicitly state in limitations that formal visa eligibility cannot be established. Do not use remembered visa rules, financial thresholds or legal requirements. Budget is compared only to the user's own estimate.
 Distinguish applicant declarations, a claim that a document is available, and verified evidence. The checklist records declarations ONLY, not inspected or authenticated documents. There is no document upload or verification; verifiedDocuments is empty. fictionalExcerpts are fictional text, never proof. Include these limitations and explain that no material concern is not confirmation of eligibility.
@@ -45,6 +46,27 @@ function reply(data: AIResponse, status = 200): Response {
 }
 function unavailable(reason: AIFailureReason, status: number) {
   return reply({ status: "unavailable", reason }, status);
+}
+
+/** Next may construct request.url with an internal hostname. Compare the
+ * browser Origin to the HTTP Host, not to arbitrary forwarded-host headers. */
+function isSameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  try {
+    const url = new URL(request.url);
+    const host = request.headers.get("host") ?? url.host;
+    const expected = new URL(`${url.protocol}//${host}`);
+    return expected.host === host && origin === expected.origin;
+  } catch {
+    return false;
+  }
+}
+
+function invalidResponse(code: string) {
+  // Fixed diagnostic codes only. Never log raw errors, applicant text or output.
+  console.warn("[VizeLens AI] rejected_response", { code });
+  return unavailable("invalid_response", 502);
 }
 
 async function readLimitedJSON(request: Request): Promise<unknown> {
@@ -96,8 +118,7 @@ export async function analyzeRequest(
   request: Request,
   config: AnalysisConfig
 ): Promise<Response> {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  if (!isSameOrigin(request))
     return unavailable("invalid_input", 403);
   let raw: unknown;
   try {
@@ -164,16 +185,16 @@ export async function analyzeRequest(
     )
       return unavailable("refused", 502);
     if (response.status !== "completed")
-      return unavailable("invalid_response", 502);
-    const result = validateAIOutput(response.output_parsed, input.data);
-    if (!result) return unavailable("invalid_response", 502);
-    return reply({ status: "success", result });
+      return invalidResponse(response.incomplete_details?.reason === "max_output_tokens" ? "output_token_limit" : "incomplete_output");
+    const checked = inspectAIOutput(response.output_parsed, input.data);
+    if (!checked.success) return invalidResponse(checked.code);
+    return reply({ status: "success", result: checked.result });
   } catch (error: unknown) {
     if (request.signal.aborted) return unavailable("cancelled", 499);
     if (deadline.aborted || error instanceof OpenAI.APIConnectionTimeoutError)
       return unavailable("timeout", 504);
-    if (error instanceof ZodError || error instanceof SyntaxError)
-      return unavailable("invalid_response", 502);
+    if (error instanceof ZodError) return invalidResponse("schema");
+    if (error instanceof SyntaxError) return invalidResponse("malformed_json");
     return unavailable("provider_error", 502);
   }
 }

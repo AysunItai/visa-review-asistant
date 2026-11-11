@@ -7,6 +7,7 @@ import {
   evidenceSources,
   toAIRequest,
   validateAIOutput,
+  inspectAIOutput,
   type AIOutput,
   REQUIRED_LIMITATIONS,
   aiReportText,
@@ -508,4 +509,60 @@ test("authoritative local findings can support concern without forcing duplicate
   assert.ok(validateAIOutput(result, data));
   const consistentData = toAIRequest(getSample("consistent"));
   assert.equal(validateAIOutput({ ...result, concernEvidence: [{ fieldId: "budget", value: consistentData.application.budget }] }, consistentData), null);
+});
+
+test("same-origin uses the actual HTTP host even when Next uses an internal URL", async () => {
+  let calls = 0;
+  const options = { ...config, fetch: (async () => { calls++; return providerResponse(); }) as typeof fetch };
+  for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
+    const response = await analyzeRequest(request(input(), { host, origin: `http://${host}` }), options);
+    assert.equal(response.status, 200);
+  }
+  const deployed = new Request("https://internal.example/api/analyze", {
+    method: "POST", headers: { "Content-Type": "application/json", host: "demo.example", origin: "https://demo.example" }, body: JSON.stringify(input()),
+  });
+  assert.equal((await analyzeRequest(deployed, options)).status, 200);
+  for (const origin of ["https://elsewhere.example", "http://localhost:3001", "https://localhost:3000", "null", "http://localhost:3000/path"]) {
+    const response = await analyzeRequest(request(input(), { host: "localhost:3000", origin, "x-forwarded-host": origin.replace(/^https?:\/\//, "") }), options);
+    assert.equal(response.status, 403);
+  }
+  assert.equal(calls, 3, "cross-origin and spoofed forwarded hosts never reach the provider");
+});
+
+test("validation diagnostics identify failing safeguards without returning applicant content", () => {
+  const priorityMismatch = output();
+  priorityMismatch.findings[0].priority = "high";
+  assert.deepEqual(inspectAIOutput(priorityMismatch, input()), { success: false, code: "priority_status_mismatch" });
+  assert.ok(validateAIOutput({ ...priorityMismatch, overallAssessment: "significant_concerns_identified" }, input()));
+  const inexact = output();
+  inexact.findings[0].evidence[0].value = "PRIVATE_MODEL_TEXT";
+  assert.deepEqual(inspectAIOutput(inexact, input()), { success: false, code: "unknown_or_inexact_evidence" });
+  const duplicate = output();
+  duplicate.findings[0].evidence = [{ fieldId: "budget", value: input().application.budget }];
+  assert.deepEqual(inspectAIOutput(duplicate, input()), { success: false, code: "duplicate_local_finding" });
+  assert.equal(validateAIOutput(duplicate, input()), null);
+});
+
+test("server logs only fixed diagnostic codes for invalid, truncated and malformed provider outputs", async (t) => {
+  const logs: unknown[][] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => { logs.push(args); });
+  const inexact = output();
+  inexact.concernEvidence = [{ fieldId: "invented", value: "PRIVATE_MODEL_TEXT" }];
+  const truncated = JSON.parse(await providerResponse(output(), "incomplete").text());
+  truncated.incomplete_details = { reason: "max_output_tokens" };
+  const malformed = JSON.parse(await providerResponse().text());
+  malformed.output[0].content[0].text = '{"private":"PRIVATE_MODEL_TEXT"';
+  const variants = [
+    { response: () => providerResponse(inexact), code: "unknown_or_inexact_evidence" },
+    { response: () => providerResponse({ private: "PRIVATE_MODEL_TEXT" }), code: "schema" },
+    { response: () => Response.json(truncated), code: "output_token_limit" },
+    { response: () => Response.json(malformed), code: "malformed_json" },
+  ];
+  for (const variant of variants) {
+    const response = await analyzeRequest(request(), { ...config, fetch: async () => variant.response() });
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { status: "unavailable", reason: "invalid_response" });
+    assert.deepEqual(logs.at(-1), ["[VizeLens AI] rejected_response", { code: variant.code }]);
+  }
+  assert.equal(logs.length, variants.length);
 });

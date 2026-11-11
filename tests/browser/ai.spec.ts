@@ -3,6 +3,17 @@ import { seedAdmin, loadSample, finalStep, submit, openSubmitted } from "./flow-
 import { assessmentFixture } from "../fixtures/assessment";
 import type { AIOutput } from "../../src/lib/ai-contract";
 
+test("browser same-origin API requests pass the origin guard without calling OpenAI", async ({ page }) => {
+  await page.goto("/");
+  const response = await page.evaluate(async () => {
+    const result = await fetch("/api/analyze", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
+    });
+    return { status: result.status, body: await result.json() };
+  });
+  expect(response).toEqual({ status: 400, body: { status: "unavailable", reason: "invalid_input" } });
+});
+
 test("failed and invalid AI preserve the case and internal note, with an honest manual retry", async ({ page }) => {
   let calls = 0;
   await page.route("**/api/analyze", async (route) => {

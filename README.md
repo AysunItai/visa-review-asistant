@@ -86,6 +86,8 @@ Başvuru metni talimat değil güvenilmeyen veridir. Gözden geçirilmiş ülke 
 - Sağlayıcı zaman aşımı 25 saniye, istemci sınırı 30 saniyedir. Otomatik tekrar yoktur. Aynı başvuruda eşzamanlı yinelenen istek engellenir.
 - JSON/şema doğrulaması, akış sırasında 64 KiB gövde sınırı, uyumsuz Origin kontrolü ve temel tanımlayıcı kalıp taraması korunur. Bu tarama tam bir kişisel veri tespit sistemi değildir.
 - Sunucu anahtarı tarayıcıya gönderilmez. SDK günlükleri kapalıdır, `store: false` ve `Cache-Control: no-store` kullanılır. Bunlar sağlayıcının tüm veri saklama koşullarını ortadan kaldırmaz.
+- Reddedilen AI yanıtları için sunucu yalnızca `[VizeLens AI] rejected_response` ve sabit bir tanı kodu yazar. Örneğin `priority_status_mismatch` özet durumuyla bulgu önceliğinin uyuşmadığını, `unknown_or_inexact_evidence` dayanağın gönderilen değerle eşleşmediğini, `output_token_limit` yanıtın token sınırında kesildiğini belirtir. Başvuru değerleri, model metni, ham hata veya anahtar yazılmaz. Aynı örneği tekrar kullanmak engellenmez; her AI yanıtı ayrıca doğrulanır ve geçerli olmayan yanıt gösterilmez.
+- Kaynak kontrolü, tarayıcının Origin değerini HTTP Host ve istek protokolüyle karşılaştırır. Böylece Next.js'in iç URL'si `localhost` olsa bile `127.0.0.1` üzerinden aynı kaynaktan gelen istekler çalışır; farklı kaynaklar ve sahte forwarded-host değerleri kabul edilmez.
 - Demo kimlik doğrulaması veya üretim kota/harcama sınırlaması içermez. Yalnızca kurgusal başvurular kullanın.
 
 ## Doğrulama
@@ -111,7 +113,9 @@ Tarayıcı testleri örnek doldurma → gönderim → yönetici → AI → simü
 
 ### Bu değişiklikte çalıştırılan kontroller — 11 Kasım 2026
 
-Node **22.21.0** ile lint, TypeScript kontrolü, **46 birim/entegrasyon testi** ve üretim derlemesi geçti. Google Chrome üzerinde `desktop` (1440 px) ve `mobile-375` projelerindeki **28 tarayıcı testi** geçti. Rol seçimi, yönetici listesi ve detay görünümünün masaüstü/mobil ekran görüntüleri incelendi. Diğer tanımlı Playwright projeleri ve fiziksel cihazlar bu değişiklikte ayrıca çalıştırılmadı. **Gerçek OpenAI sağlayıcı çağrısı yapılmadı.**
+AI hata incelemesinde Node **22.21.0** ile lint, TypeScript kontrolü, **49 birim/entegrasyon testi** ve üretim derlemesi geçti. Google Chrome üzerinde `desktop` ve `mobile-375` projelerinde AI hata/tekrar deneme, istek kimliği, ön inceleme düzeyleri, gönderilen alanlar ve gerçek HTTP kaynak kontrolünü kapsayan **10 tarayıcı testi** çalıştırıldı. Diğer tarayıcı senaryoları bu düzeltmede tekrar çalıştırılmadı.
+
+Otomatik testlerden ayrı olarak, mevcut `OPENAI_MODEL` değiştirilmeden **iki gerçek sağlayıcı çağrısı** yapıldı. Kurgusal konaklama/bütçe uyuşmazlığı örneği `medium`, tutarlı örnek `low` sonucuyla sunucu doğrulamasından geçti. Bu sonuçlar her gelecek model yanıtının doğrulanacağını garanti etmez. Bildirilen önceki başarısız yanıt saklanmadığı için onun hangi kontrolde elendiği kesinleştirilemedi; sonraki hatalarda sabit tanı kodları kullanılabilir.
 
 ## Kapsam dışında
 
